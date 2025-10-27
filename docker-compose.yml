@@ -1,0 +1,48 @@
+version: '3.9'
+
+services:
+  terracore-db:
+    image: postgis/postgis:15-3.3
+    container_name: terracore-db
+    restart: always
+    environment:
+      POSTGRES_USER: terracore_user
+      POSTGRES_PASSWORD: Terracore@2025
+      POSTGRES_DB: terracore
+    ports:
+      - "5432:5432"
+    volumes:
+      - terracore_pgdata:/var/lib/postgresql/data
+
+  terracore-geoserver:
+    image: kartoza/geoserver:2.25.0
+    container_name: terracore-geoserver
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      GEOSERVER_ADMIN_USER: admin
+      GEOSERVER_ADMIN_PASSWORD: admin
+    depends_on:
+      - terracore-db
+    volumes:
+      - terracore_geoserver_data:/opt/geoserver/data_dir
+
+  terracore-minio:
+    image: minio/minio
+    container_name: terracore-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: TerracoreStorage@2025
+    volumes:
+      - terracore_minio_data:/data
+
+volumes:
+  terracore_pgdata:
+  terracore_geoserver_data:
+  terracore_minio_data:
