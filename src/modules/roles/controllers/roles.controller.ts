@@ -8,12 +8,14 @@ import {
   Delete,
   ParseEnumPipe,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { RolesService } from '../services/roles.service';
 import { CreateRoleDto } from '../dtos/request/create-role.dto';
 import { UpdateRoleDto } from '../dtos/request/update-role.dto';
 import { CreatePermissionDto } from '../dtos/request/create-permission.dto';
 import { RoleName } from '../constants/role-name.constant';
 
+@ApiTags('Roles')
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
