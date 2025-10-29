@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 import { User } from '../../users/entities/user.entity';
 import { RegisterDto } from '../dtos/request/register.dto';
@@ -25,6 +26,7 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     private readonly rolesService: RolesService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     private readonly logger: AppLoggerService,
   ) {
     this.logger.setContext(AuthService.name);
@@ -78,39 +80,51 @@ export class AuthService {
   }
 
   async login(user: AuthenticatedUser): Promise<AuthResponseDto> {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role.name,
-      tokenVersion: user.tokenVersion,
-    };
-
-    const [accessToken, lastLogin] = await Promise.all([
-      this.jwtService.signAsync(payload),
+    const [{ accessToken, refreshToken }, lastLogin] = await Promise.all([
+      this.generateTokens(user),
       this.touchLastLogin(user.id),
     ]);
 
     this.logger.event(`User logged in: ${user.email}`);
 
-    return {
-      message: AUTH_MESSAGES.LOGIN_SUCCESS,
+    return this.buildAuthResponse(
+      { ...user, lastLogin },
       accessToken,
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        isActive: user.isActive,
-        lastLogin,
-        role: {
-          id: user.role.id,
-          name: user.role.name,
-          description: user.role.description,
-          permissions: user.role.permissions,
-        },
-      },
-    };
+      refreshToken,
+      AUTH_MESSAGES.LOGIN_SUCCESS,
+    );
+  }
+
+  async refreshTokens(refreshToken: string): Promise<AuthResponseDto> {
+    let payload: JwtPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: this.getRefreshTokenSecret(),
+      });
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : 'Unknown verification error';
+      this.logger.warn(`Refresh token verification failed: ${reason}`);
+      throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
+    }
+
+    const user = await this.findActiveUserById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException(AUTH_MESSAGES.INVALID_TOKEN);
+    }
+
+    if (user.tokenVersion !== payload.tokenVersion) {
+      throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
+    }
+
+    const tokens = await this.generateTokens(user);
+    this.logger.event(`Refresh token rotated for: ${user.email}`);
+    return this.buildAuthResponse(
+      user,
+      tokens.accessToken,
+      tokens.refreshToken,
+      AUTH_MESSAGES.REFRESH_SUCCESS,
+    );
   }
 
   async findActiveUserById(id: string): Promise<AuthenticatedUser | null> {
@@ -167,5 +181,80 @@ export class AuthService {
     const lastLogin = new Date();
     await this.userRepo.update({ id }, { lastLogin });
     return lastLogin;
+  }
+
+  private async generateTokens(user: AuthenticatedUser): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role.name,
+      tokenVersion: user.tokenVersion,
+    };
+
+    const accessTokenPromise = this.jwtService.signAsync(payload, {
+      expiresIn: this.getAccessTokenExpiry(),
+    });
+
+    const refreshTokenPromise = this.jwtService.signAsync(payload, {
+      secret: this.getRefreshTokenSecret(),
+      expiresIn: this.getRefreshTokenExpiry(),
+    });
+
+    const [accessToken, refreshToken] = await Promise.all([
+      accessTokenPromise,
+      refreshTokenPromise,
+    ]);
+
+    return { accessToken, refreshToken };
+  }
+
+  private buildAuthResponse(
+    user: AuthenticatedUser,
+    accessToken: string,
+    refreshToken: string,
+    message: string,
+  ): AuthResponseDto {
+    return {
+      message,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        role: {
+          id: user.role.id,
+          name: user.role.name,
+          description: user.role.description,
+          permissions: user.role.permissions,
+        },
+      },
+    };
+  }
+
+  private getAccessTokenExpiry(): number {
+    const raw = this.configService.get<string>('JWT_EXPIRES_IN');
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 3600;
+  }
+
+  private getRefreshTokenExpiry(): number {
+    const raw = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN');
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 7 * 24 * 60 * 60;
+  }
+
+  private getRefreshTokenSecret(): string {
+    return (
+      this.configService.get<string>('JWT_REFRESH_SECRET') ??
+      this.configService.get<string>('JWT_SECRET', 'change-me')
+    );
   }
 }

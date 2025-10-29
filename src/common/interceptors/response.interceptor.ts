@@ -17,7 +17,9 @@ export class ResponseInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((data) => {
+        const success = response.statusCode < 400;
         return {
+          success,
           statusCode: response.statusCode,
           path: request.url,
           message: this.extractMessage(data),

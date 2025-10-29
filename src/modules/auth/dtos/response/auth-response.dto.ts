@@ -70,6 +70,12 @@ export class AuthResponseDto {
   })
   accessToken: string;
 
+  @ApiProperty({
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTczNTU5MjAwMCwiZXhwIjoxNzM3MTk2ODAwfQ.REFRESH_SAMPLE',
+  })
+  refreshToken: string;
+
   @ApiProperty({ type: AuthUserDto })
   user: AuthUserDto;
 }

@@ -5,6 +5,8 @@ export const AUTH_MESSAGES = {
   ACCOUNT_INACTIVE: 'Your account is currently inactive. Contact support.',
   LOGIN_SUCCESS: 'Login successful',
   INVALID_TOKEN: 'Invalid or expired authentication token',
+  REFRESH_SUCCESS: 'Token refresh successful',
+  INVALID_REFRESH_TOKEN: 'Invalid refresh token',
 } as const;
 
 export type AuthMessageKey = keyof typeof AUTH_MESSAGES;
