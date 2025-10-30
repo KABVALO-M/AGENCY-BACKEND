@@ -61,6 +61,13 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastLogin?: Date;
 
+  // Email verification tracking
+  @Column({ default: false })
+  emailVerified: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerifiedAt?: Date;
+
   // Audit fields
   @CreateDateColumn()
   createdAt: Date;

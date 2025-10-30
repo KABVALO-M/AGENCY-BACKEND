@@ -51,6 +51,7 @@ export class AuthService {
     password: hashedPassword,
     role: defaultRole,
     isActive: false,
+    emailVerified: false,
   });
 
   await this.userRepo.save(user);
@@ -65,19 +66,26 @@ export class AuthService {
   return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_SENT };
 }
 
+private async queueVerificationEmail(user: User): Promise<void> {
+  const verification = await this.createEmailVerificationToken(user);
+  await this.emailService.sendEmailVerification(user.email, {
+    firstName: user.firstName,
+    verificationToken: verification.token,
+    expiresAt: verification.expiresAt.toISOString(),
+  });
+  this.logger.event(`Queued verification email for: ${user.email}`);
+}
+
 private async sendVerificationEmailAsync(user: User): Promise<void> {
   try {
-    const verification = await this.createEmailVerificationToken(user);
-    await this.emailService.sendEmailVerification(user.email, {
-      firstName: user.firstName,
-      verificationToken: verification.token,
-      expiresAt: verification.expiresAt.toISOString(),
-    });
-    this.logger.event(`Queued verification email for: ${user.email}`);
+    await this.queueVerificationEmail(user);
   } catch (error) {
     // Log but don't throw - registration should still succeed
     const reason = error instanceof Error ? error.message : 'Unknown error';
-    this.logger.error(`Failed to queue verification email: ${reason}`, error instanceof Error ? error.stack : undefined);
+    this.logger.error(
+      `Failed to queue verification email: ${reason}`,
+      error instanceof Error ? error.stack : undefined,
+    );
   }
 }
 
@@ -93,6 +101,13 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
     if (!user) {
       this.logger.warn(`Login attempt failed for "${email}": user not found`);
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_CREDENTIALS);
+    }
+
+    if (!user.emailVerified) {
+      this.logger.warn(
+        `Login attempt failed for "${email}": email not verified`,
+      );
+      throw new UnauthorizedException(AUTH_MESSAGES.EMAIL_NOT_VERIFIED);
     }
 
     if (!user.isActive) {
@@ -175,13 +190,17 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
 
     const user = verification.user;
 
-    if (user.isActive) {
+    if (user.emailVerified) {
       verification.used = true;
       await this.emailVerificationRepo.save(verification);
       throw new BadRequestException(AUTH_MESSAGES.ACCOUNT_ALREADY_VERIFIED);
     }
 
+    const verifiedAt = new Date();
+
     user.isActive = true;
+    user.emailVerified = true;
+    user.emailVerifiedAt = verifiedAt;
     verification.used = true;
 
     await Promise.all([
@@ -193,10 +212,31 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
 
     await this.emailService.sendWelcomeEmail(user.email, {
       firstName: user.firstName,
-      verifiedAt: new Date().toISOString(),
+      verifiedAt: verifiedAt.toISOString(),
     });
 
     return { message: AUTH_MESSAGES.VERIFICATION_SUCCESS };
+  }
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = :email', { email: normalizedEmail })
+      .getOne();
+
+    if (!user) {
+      throw new BadRequestException(AUTH_MESSAGES.ACCOUNT_NOT_FOUND);
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException(AUTH_MESSAGES.ACCOUNT_ALREADY_VERIFIED);
+    }
+
+    await this.queueVerificationEmail(user);
+    this.logger.event(`Resent verification email for: ${user.email}`);
+
+    return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_RESENT };
   }
 
   async findActiveUserById(id: string): Promise<AuthenticatedUser | null> {
@@ -206,6 +246,9 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
       .leftJoinAndSelect('role.permissions', 'permission')
       .where('user.id = :id', { id })
       .andWhere('user.isActive = :isActive', { isActive: true })
+      .andWhere('user.emailVerified = :emailVerified', {
+        emailVerified: true,
+      })
       .getOne();
 
     if (!user) return null;
@@ -223,6 +266,8 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
       lastName,
       phone,
       isActive,
+      emailVerified,
+      emailVerifiedAt,
       tokenVersion,
       lastLogin,
     } = user;
@@ -234,14 +279,16 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
       lastName,
       phone,
       isActive,
+      emailVerified,
+      emailVerifiedAt,
       tokenVersion,
       lastLogin,
       role: {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        permissions:
-          role.permissions?.map((permission) => ({
+          id: role.id,
+          name: role.name,
+          description: role.description,
+          permissions:
+            role.permissions?.map((permission) => ({
             id: permission.id,
             name: permission.name,
             description: permission.description,
@@ -301,6 +348,8 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
         email: user.email,
         phone: user.phone,
         isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        emailVerifiedAt: user.emailVerifiedAt,
         lastLogin: user.lastLogin,
         role: {
           id: user.role.id,

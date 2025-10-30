@@ -48,6 +48,17 @@ class AuthUserDto {
   @ApiProperty({ example: true })
   isActive: boolean;
 
+  @ApiProperty({ example: false })
+  emailVerified: boolean;
+
+  @ApiProperty({
+    example: '2025-01-08T09:40:00.000Z',
+    required: false,
+    type: String,
+    format: 'date-time',
+  })
+  emailVerifiedAt?: Date;
+
   @ApiProperty({
     example: '2025-01-08T09:35:27.000Z',
     required: false,

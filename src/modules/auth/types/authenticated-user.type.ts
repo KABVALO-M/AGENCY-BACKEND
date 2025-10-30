@@ -20,6 +20,8 @@ export interface AuthenticatedUser {
   lastName: string;
   phone?: string;
   isActive: boolean;
+  emailVerified: boolean;
+  emailVerifiedAt?: Date;
   tokenVersion: number;
   lastLogin?: Date;
   role: AuthRolePayload;

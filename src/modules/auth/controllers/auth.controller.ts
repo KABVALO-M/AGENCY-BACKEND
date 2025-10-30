@@ -13,6 +13,7 @@ import { RegisterDto } from '../dtos/request/register.dto';
 import { LoginDto } from '../dtos/request/login.dto';
 import { RefreshTokenDto } from '../dtos/request/refresh-token.dto';
 import { VerifyEmailDto } from '../dtos/request/verify-email.dto';
+import { ResendVerificationDto } from '../dtos/request/resend-verification.dto';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
 import { AuthResponseDto } from '../dtos/response/auth-response.dto';
@@ -55,5 +56,12 @@ export class AuthController {
   @ApiBody({ type: VerifyEmailDto })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: ResendVerificationDto })
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto.email);
   }
 }
