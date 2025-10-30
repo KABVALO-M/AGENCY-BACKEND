@@ -15,6 +15,7 @@ import { RefreshTokenDto } from '../dtos/request/refresh-token.dto';
 import { VerifyEmailDto } from '../dtos/request/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/request/resend-verification.dto';
 import { CurrentUser } from '../decorators/current-user.decorator';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
 import { AuthResponseDto } from '../dtos/response/auth-response.dto';
 
@@ -49,6 +50,13 @@ export class AuthController {
     @Body() dto: RefreshTokenDto,
   ): Promise<AuthResponseDto> {
     return this.authService.refreshTokens(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async logout(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.logout(user);
   }
 
   @Post('verify-email')

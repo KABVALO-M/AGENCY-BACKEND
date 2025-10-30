@@ -16,6 +16,7 @@ export const AUTH_MESSAGES = {
   VERIFICATION_SUCCESS: 'Email verified successfully',
   VERIFICATION_EMAIL_RESENT: 'Verification email resent successfully',
   ACCOUNT_ALREADY_VERIFIED: 'Account already verified',
+  LOGOUT_SUCCESS: 'Logout successful',
 } as const;
 
 export type AuthMessageKey = keyof typeof AUTH_MESSAGES;

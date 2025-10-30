@@ -162,10 +162,17 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
-    const tokens = await this.generateTokens(user);
+    const nextTokenVersion = user.tokenVersion + 1;
+    await this.userRepo.increment({ id: user.id }, 'tokenVersion', 1);
+    const updatedUser: AuthenticatedUser = {
+      ...user,
+      tokenVersion: nextTokenVersion,
+    };
+
+    const tokens = await this.generateTokens(updatedUser);
     this.logger.event(`Refresh token rotated for: ${user.email}`);
     return this.buildAuthResponse(
-      user,
+      updatedUser,
       tokens.accessToken,
       tokens.refreshToken,
       AUTH_MESSAGES.REFRESH_SUCCESS,
@@ -237,6 +244,12 @@ private async sendVerificationEmailAsync(user: User): Promise<void> {
     this.logger.event(`Resent verification email for: ${user.email}`);
 
     return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_RESENT };
+  }
+
+  async logout(user: AuthenticatedUser): Promise<{ message: string }> {
+    await this.userRepo.increment({ id: user.id }, 'tokenVersion', 1);
+    this.logger.event(`User logged out: ${user.email}`);
+    return { message: AUTH_MESSAGES.LOGOUT_SUCCESS };
   }
 
   async findActiveUserById(id: string): Promise<AuthenticatedUser | null> {
