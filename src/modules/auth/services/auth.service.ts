@@ -2,12 +2,14 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
 
 import { User } from '../../users/entities/user.entity';
 import { RegisterDto } from '../dtos/request/register.dto';
@@ -18,38 +20,66 @@ import { AppLoggerService } from '../../../common/logger/app-logger.service';
 import { AUTH_MESSAGES } from '../messages/auth.messages';
 import { AuthenticatedUser } from '../types/authenticated-user.type';
 import { JwtPayload } from '../types/jwt-payload.interface';
+import { EmailVerificationToken } from '../entities/email-verification-token.entity';
+import { EmailService } from '../../../common/services/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(EmailVerificationToken)
+    private readonly emailVerificationRepo: Repository<EmailVerificationToken>,
     private readonly rolesService: RolesService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
     private readonly logger: AppLoggerService,
   ) {
     this.logger.setContext(AuthService.name);
   }
 
   async register(dto: RegisterDto): Promise<{ message: string }> {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException(AUTH_MESSAGES.EMAIL_EXISTS);
+  const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+  if (existing) throw new ConflictException(AUTH_MESSAGES.EMAIL_EXISTS);
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const defaultRole = await this.rolesService.findByName(RoleName.User);
+  const hashedPassword = await bcrypt.hash(dto.password, 10);
+  const defaultRole = await this.rolesService.findByName(RoleName.User);
 
-    const user = this.userRepo.create({
-      ...dto,
-      password: hashedPassword,
-      role: defaultRole,
+  const user = this.userRepo.create({
+    ...dto,
+    password: hashedPassword,
+    role: defaultRole,
+    isActive: false,
+  });
+
+  await this.userRepo.save(user);
+
+  // Send email asynchronously - don't block registration
+  this.sendVerificationEmailAsync(user).catch(error => {
+    this.logger.error(`Failed to send verification email for ${user.email}`, error.stack);
+  });
+
+  this.logger.event(`User registered: ${user.email}`);
+
+  return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_SENT };
+}
+
+private async sendVerificationEmailAsync(user: User): Promise<void> {
+  try {
+    const verification = await this.createEmailVerificationToken(user);
+    await this.emailService.sendEmailVerification(user.email, {
+      firstName: user.firstName,
+      verificationToken: verification.token,
+      expiresAt: verification.expiresAt.toISOString(),
     });
-
-    await this.userRepo.save(user);
-    this.logger.event(`User registered: ${user.email}`);
-
-    return { message: AUTH_MESSAGES.REGISTRATION_SUCCESS };
+    this.logger.event(`Queued verification email for: ${user.email}`);
+  } catch (error) {
+    // Log but don't throw - registration should still succeed
+    const reason = error instanceof Error ? error.message : 'Unknown error';
+    this.logger.error(`Failed to queue verification email: ${reason}`, error instanceof Error ? error.stack : undefined);
   }
+}
 
   async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
     const user = await this.userRepo
@@ -127,6 +157,48 @@ export class AuthService {
     );
   }
 
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const verification = await this.emailVerificationRepo.findOne({
+      where: { token },
+      relations: ['user', 'user.role', 'user.role.permissions'],
+    });
+
+    if (!verification || verification.used) {
+      throw new BadRequestException(AUTH_MESSAGES.VERIFICATION_INVALID);
+    }
+
+    if (verification.expiresAt.getTime() < Date.now()) {
+      verification.used = true;
+      await this.emailVerificationRepo.save(verification);
+      throw new BadRequestException(AUTH_MESSAGES.VERIFICATION_EXPIRED);
+    }
+
+    const user = verification.user;
+
+    if (user.isActive) {
+      verification.used = true;
+      await this.emailVerificationRepo.save(verification);
+      throw new BadRequestException(AUTH_MESSAGES.ACCOUNT_ALREADY_VERIFIED);
+    }
+
+    user.isActive = true;
+    verification.used = true;
+
+    await Promise.all([
+      this.userRepo.save(user),
+      this.emailVerificationRepo.save(verification),
+    ]);
+
+    this.logger.event(`User verified email: ${user.email}`);
+
+    await this.emailService.sendWelcomeEmail(user.email, {
+      firstName: user.firstName,
+      verifiedAt: new Date().toISOString(),
+    });
+
+    return { message: AUTH_MESSAGES.VERIFICATION_SUCCESS };
+  }
+
   async findActiveUserById(id: string): Promise<AuthenticatedUser | null> {
     const user = await this.userRepo
       .createQueryBuilder('user')
@@ -168,11 +240,12 @@ export class AuthService {
         id: role.id,
         name: role.name,
         description: role.description,
-        permissions: role.permissions?.map((permission) => ({
-          id: permission.id,
-          name: permission.name,
-          description: permission.description,
-        })) ?? [],
+        permissions:
+          role.permissions?.map((permission) => ({
+            id: permission.id,
+            name: permission.name,
+            description: permission.description,
+          })) ?? [],
       },
     };
   }
@@ -239,6 +312,28 @@ export class AuthService {
     };
   }
 
+  private async createEmailVerificationToken(
+    user: User,
+  ): Promise<EmailVerificationToken> {
+    await this.emailVerificationRepo.update(
+      { user: { id: user.id }, used: false },
+      { used: true },
+    );
+
+    const expiresAt = new Date(
+      Date.now() + this.getEmailVerificationExpiry() * 1000,
+    );
+
+    const token = this.emailVerificationRepo.create({
+      user,
+      token: randomBytes(32).toString('hex'),
+      expiresAt,
+      used: false,
+    });
+
+    return this.emailVerificationRepo.save(token);
+  }
+
   private getAccessTokenExpiry(): number {
     const raw = this.configService.get<string>('JWT_EXPIRES_IN');
     const parsed = Number(raw);
@@ -256,5 +351,11 @@ export class AuthService {
       this.configService.get<string>('JWT_REFRESH_SECRET') ??
       this.configService.get<string>('JWT_SECRET', 'change-me')
     );
+  }
+
+  private getEmailVerificationExpiry(): number {
+    const raw = this.configService.get<string>('EMAIL_VERIFICATION_EXPIRES_IN');
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 24 * 60 * 60;
   }
 }

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    build:
+      context: ./docker/rabbitmq
+      dockerfile: Dockerfile
+    image: terracore-rabbitmq
+    container_name: terracore-rabbitmq
+    ports:
+      - '5889:5672'   # AMQP port
+      - '15889:15672' # Web management UI (changed to avoid conflict)
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - terracore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'rabbitmqctl', 'status']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  terracore-network:
+    driver: bridge

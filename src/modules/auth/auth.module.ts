@@ -10,10 +10,13 @@ import { RolesModule } from '../roles/roles.module';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { EmailService } from '../../common/services/email.service';
+import { EmailQueueService } from '../../common/rabbitmq/email-queue.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, EmailVerificationToken]),
     RolesModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({
@@ -33,7 +36,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+    JwtAuthGuard,
+    EmailService,
+    EmailQueueService,
+  ],
   exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
