@@ -11,12 +11,13 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { EmailService } from '../../common/services/email.service';
 import { EmailQueueService } from '../../common/rabbitmq/email-queue.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, EmailVerificationToken]),
+    TypeOrmModule.forFeature([User, EmailVerificationToken, PasswordResetToken]),
     RolesModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({

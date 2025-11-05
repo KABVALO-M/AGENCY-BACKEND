@@ -17,6 +17,13 @@ export const AUTH_MESSAGES = {
   VERIFICATION_EMAIL_RESENT: 'Verification email resent successfully',
   ACCOUNT_ALREADY_VERIFIED: 'Account already verified',
   LOGOUT_SUCCESS: 'Logout successful',
+  PASSWORD_CURRENT_INVALID: 'Current password is incorrect',
+  PASSWORD_CHANGE_SUCCESS: 'Password updated successfully',
+  PASSWORD_RESET_EMAIL_SENT:
+    'If an account exists for that email, a reset link has been sent.',
+  PASSWORD_RESET_INVALID: 'Invalid or already used password reset token',
+  PASSWORD_RESET_EXPIRED: 'Password reset token has expired',
+  PASSWORD_RESET_SUCCESS: 'Password has been reset successfully',
 } as const;
 
 export type AuthMessageKey = keyof typeof AUTH_MESSAGES;

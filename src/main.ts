@@ -61,8 +61,17 @@ async function bootstrap() {
   );
 
   // ✅ Enable CORS
+  const corsEnv = configService.get<string>('CORS_ORIGIN', '');
+  const parsedOrigins = corsEnv
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  const defaultOrigin = configService.get<string>('APP_URL') || 'http://localhost:3000';
+  const allowedOrigins = parsedOrigins.length > 0 ? parsedOrigins : [defaultOrigin];
+
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN', '*').split(','),
+    origin: allowedOrigins,
     credentials: true,
   });
 

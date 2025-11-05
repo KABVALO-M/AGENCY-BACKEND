@@ -13,6 +13,12 @@ export interface WelcomeEmailData {
   verifiedAt: string;
 }
 
+export interface PasswordResetEmailData {
+  firstName: string;
+  resetToken: string;
+  expiresAt: string;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -40,6 +46,15 @@ export class EmailService {
       this.logger.log(`Queued welcome email for ${userEmail}`);
     } catch (error) {
       this.logger.error(`Failed to queue welcome email for ${userEmail}: ${error.message}`);
+    }
+  }
+
+  async sendPasswordResetEmail(userEmail: string, data: PasswordResetEmailData) {
+    try {
+      await this.emailQueueService.queuePasswordResetEmail(userEmail, data);
+      this.logger.log(`Queued password reset email for ${userEmail}`);
+    } catch (error) {
+      this.logger.error(`Failed to queue password reset email for ${userEmail}: ${error.message}`);
     }
   }
 }
