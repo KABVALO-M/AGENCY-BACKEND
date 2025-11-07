@@ -110,7 +110,7 @@ export class AuthController {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 
-  @Post('resend-verification')
+  @Post('resend-verification-email')
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: ResendVerificationDto })
   async resendVerification(@Body() dto: ResendVerificationDto) {

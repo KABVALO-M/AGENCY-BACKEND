@@ -14,6 +14,9 @@ import { RolesModule } from './modules/roles/roles.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmailWorkerModule } from './email-worker/email-worker.module';
 
+// 🗺️ GIS Land Parcels Module
+import { ParcelsModule } from './modules/parcels/parcels.module';
+
 @Module({
   imports: [
     // 🌍 Environment variables (global)
@@ -32,6 +35,9 @@ import { EmailWorkerModule } from './email-worker/email-worker.module';
     // 🔐 Core modules
     RolesModule,
     AuthModule,
+
+    // 🗺️ GIS Parcels Module
+    ParcelsModule,
 
     // 📨 Email worker microservice
     EmailWorkerModule,
