@@ -1,36 +1,73 @@
 import {
-    IsNotEmpty,
-    IsOptional,
-    IsString,
-    IsNumber,
-    IsObject,
-  } from 'class-validator';
-  import { Type } from 'class-transformer';
-  
-  export class CreateParcelDto {
-    @IsString()
-    @IsNotEmpty()
-    name: string;
-  
-    @IsOptional()
-    @IsString()
-    description?: string;
-  
-    @IsOptional()
-    @IsString()
-    titleNumber?: string;
-  
-    @IsOptional()
-    @IsObject()
-    geometry?: any; // GeoJSON polygon if not using shapefile
-  
-    @IsOptional()
-    @Type(() => Number)
-    @IsNumber()
-    population?: number;
-  
-    @IsOptional()
-    @IsString()
-    status?: string;
-  }
-  
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsObject,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class CreateParcelDto {
+  @ApiProperty({
+    description: 'Human friendly parcel name',
+    example: 'Parcel 17 - Downtown',
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional free-text details about the parcel',
+    example: 'Vacant lot close to the river.',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Land/registry title document number',
+    example: 'TTX-009123',
+  })
+  @IsOptional()
+  @IsString()
+  titleNumber?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'GeoJSON polygon geometry. If omitted, upload a shapefile instead.',
+    example: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [30.121, -1.951],
+          [30.122, -1.951],
+          [30.122, -1.952],
+          [30.121, -1.952],
+          [30.121, -1.951],
+        ],
+      ],
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  geometry?: any; // GeoJSON polygon if not using shapefile
+
+  @ApiPropertyOptional({
+    description: 'Estimated population living within the parcel',
+    example: 125,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  population?: number;
+
+  @ApiPropertyOptional({
+    description: 'Workflow status of the parcel',
+    example: 'available',
+    default: 'available',
+  })
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
