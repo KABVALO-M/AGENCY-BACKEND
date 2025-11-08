@@ -7,6 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
+import type { Geometry } from 'geojson';
 import { User } from '../../users/entities/user.entity';
 import { ParcelStatus } from '../constants/parcel-status.constant';
 
@@ -28,10 +29,9 @@ export class Parcel {
   // ─────────────── GEOMETRY ───────────────
   @Column({
     type: 'geometry',
-    spatialFeatureType: 'Polygon',
     srid: 4326,
   })
-  geometry: any;
+  geometry: Geometry;
 
   // ─────────────── OWNER RELATION ───────────────
   @ManyToOne(() => User, { eager: true, onDelete: 'SET NULL' })
@@ -57,10 +57,14 @@ export class Parcel {
   })
   status: ParcelStatus;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  // Changed from decimal(12, 2) to decimal(15, 2) to support larger areas
+  // Max value: 10^13 = 10,000,000,000,000 m² (10 million km²)
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   area?: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  // Changed from decimal(12, 2) to decimal(15, 2) to support larger perimeters
+  // Max value: 10^13 = 10,000,000,000,000 m (10 billion km)
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   perimeter?: number;
 
   @Column({ type: 'int', nullable: true })
