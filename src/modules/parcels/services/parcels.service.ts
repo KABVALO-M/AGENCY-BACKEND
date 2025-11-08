@@ -201,7 +201,7 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
         return parcel;
     }
 
-     // ──────────────────────────────── UPDATE PARCEL ────────────────────────────────
+    // ──────────────────────────────── UPDATE PARCEL ────────────────────────────────
     async update(
         id: string,
         dto: UpdateParcelDto,
