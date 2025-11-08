@@ -1,3 +1,4 @@
+import '../../../common/polyfills/global-this';
 import {
   Injectable,
   BadRequestException,
