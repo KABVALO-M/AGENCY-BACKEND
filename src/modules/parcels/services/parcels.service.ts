@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DeepPartial } from 'typeorm';
+import { Repository, DeepPartial, IsNull } from 'typeorm';
 import { Parcel } from '../entities/parcel.entity';
 import { CreateParcelDto } from '../dtos/request/create-parcel.dto';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
@@ -106,6 +106,7 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
         .createQueryBuilder('parcel')
         .leftJoinAndSelect('parcel.createdBy', 'createdBy')
         .leftJoinAndSelect('parcel.owner', 'owner')
+        .where('parcel.deletedAt IS NULL')
         .orderBy('parcel.createdAt', 'DESC');
     
         if (status) {
@@ -161,7 +162,7 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
     async findOne(id: string, asGeoJson = false): Promise<any> {
         // Find parcel with related entities
         const parcel = await this.parcelRepository.findOne({
-        where: { id },
+        where: { id, deletedAt: IsNull() },
         relations: ['createdBy', 'owner'],
         });
     
@@ -299,6 +300,28 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
         return { message: PARCEL_MESSAGES.UPDATED, data: saved };
         } catch (error) {
         throw new InternalServerErrorException(PARCEL_MESSAGES.UPDATE_FAILED);
+        }
+    }
+    
+    // ──────────────────────────────── SOFT DELETE PARCEL ────────────────────────────────
+    async softDelete(id: string): Promise<{ message: string }> {
+        const parcel = await this.parcelRepository.findOne({ where: { id } });
+    
+        if (!parcel) {
+        throw new NotFoundException(PARCEL_MESSAGES.NOT_FOUND);
+        }
+    
+        if (parcel.deletedAt) {
+        throw new BadRequestException(PARCEL_MESSAGES.ALREADY_DELETED);
+        }
+    
+        parcel.deletedAt = new Date();
+    
+        try {
+        await this.parcelRepository.save(parcel);
+        return { message: PARCEL_MESSAGES.DELETED };
+        } catch (error) {
+        throw new InternalServerErrorException(PARCEL_MESSAGES.DELETE_FAILED);
         }
     }
   

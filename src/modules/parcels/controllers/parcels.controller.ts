@@ -13,6 +13,7 @@ import {
   Param,
   ParseBoolPipe,
   Patch,
+  Delete,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -274,5 +275,26 @@ export class ParcelsController {
     const images = files?.images;
     const shapefile = files?.shapefile?.[0];
     return this.parcelsService.update(id, dto, user, images, shapefile);
+  }
+
+  // ──────────────────────────────── DELETE (SOFT) PARCEL ────────────────────────────────
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Soft delete a parcel',
+    description:
+      'Marks the parcel as deleted by setting deletedAt timestamp. It remains in the database but will be excluded from normal queries.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Parcel UUID',
+    example: '07cf1b52-fb4d-46e8-8c4a-b29a4ab2dfee',
+  })
+  @ApiOkResponse({
+    description: 'Parcel soft-deleted successfully.',
+  })
+  async softDelete(@Param('id') id: string) {
+    return this.parcelsService.softDelete(id);
   }
 }

@@ -72,4 +72,12 @@ export class Parcel {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // ─────────────── SOFT DELETE ───────────────
+  /**
+   * When this column has a value, the parcel is considered deleted.
+   * If null, the parcel is active.
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  deletedAt?: Date;
 }
