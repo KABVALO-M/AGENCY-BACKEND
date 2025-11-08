@@ -67,7 +67,7 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  const defaultOrigin = configService.get<string>('APP_URL') || 'http://localhost:3000';
+  const defaultOrigin = configService.get<string>('APP_URL') || 'http://localhost:3001';
   const allowedOrigins = parsedOrigins.length > 0 ? parsedOrigins : [defaultOrigin];
 
   app.enableCors({

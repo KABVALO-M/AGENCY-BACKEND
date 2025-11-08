@@ -16,8 +16,8 @@ import { ParcelStatus } from '../constants/parcel-status.constant';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as turf from '@turf/turf';
-import shp from 'shpjs';
 import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
+import { parseGeometryFile } from '../utils/geometry-file.util';
   
   @Injectable()
   export class ParcelsService {
@@ -28,74 +28,64 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
   
     // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
     async create(
-      dto: CreateParcelDto,
-      user: AuthenticatedUser,
-      images?: Express.Multer.File[],
-      shapefile?: Express.Multer.File,
-    ): Promise<{ message: string; data: Parcel }> {
-      let geometry = dto.geometry;
-  
-      // 1️⃣ Parse shapefile if uploaded
-      if (!geometry && shapefile) {
-        const filePath = path.join(process.cwd(), 'uploads/parcels', shapefile.filename);
-        try {
+        dto: CreateParcelDto,
+        user: AuthenticatedUser,
+        images?: Express.Multer.File[],
+        shapefile?: Express.Multer.File,
+      ): Promise<{ message: string; data: Parcel }> {
+        let geometry = dto.geometry;
+      
+        // ────────────────────────────── 1️⃣ Parse Uploaded File (if any)
+        if (!geometry && shapefile) {
+          const filePath = path.join(process.cwd(), "uploads/parcels", shapefile.filename);
           const fileBuffer = fs.readFileSync(filePath);
-          const geojson = await shp(fileBuffer);
-          if (!geojson.features?.length) {
-            throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_EMPTY);
-          }
-          geometry = geojson.features[0].geometry;
+          geometry = await parseGeometryFile(fileBuffer, shapefile.originalname);
+        }
+      
+        if (!geometry) {
+          throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_REQUIRED);
+        }
+      
+        // ────────────────────────────── 2️⃣ Compute area & perimeter using turf.js
+        let area = 0;
+        let perimeter = 0;
+        try {
+          const feature = turf.feature(geometry);
+          area = turf.area(feature); // m²
+          perimeter = Number((turf.length(feature, { units: "kilometers" }) * 1000).toFixed(2)); // meters
+        } catch {
+          throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_INVALID);
+        }
+      
+        const imageUrls = images?.length
+          ? images.map((file) => `/uploads/parcels/${file.filename}`)
+          : undefined;
+      
+        // ────────────────────────────── 3️⃣ Build and save entity
+        const parcelData: DeepPartial<Parcel> = {
+          name: dto.name,
+          description: dto.description,
+          titleNumber: dto.titleNumber,
+          geometry,
+          area,
+          perimeter,
+          population: dto.population,
+          status: dto.status ?? ParcelStatus.AVAILABLE,
+          createdBy: { id: user.id } as DeepPartial<User>,
+          imageUrls,
+          shapefileUrl: shapefile ? `/uploads/parcels/${shapefile.filename}` : undefined,
+        };
+      
+        const parcel = this.parcelRepository.create(parcelData);
+      
+        try {
+          const saved = await this.parcelRepository.save(parcel);
+          return { message: PARCEL_MESSAGES.CREATED, data: saved };
         } catch (error) {
-          throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_PARSE_ERROR);
+          console.error("Parcel create error:", error);
+          throw new InternalServerErrorException(PARCEL_MESSAGES.CREATE_FAILED);
         }
       }
-  
-      if (!geometry) {
-        throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_REQUIRED);
-      }
-  
-      // 2️⃣ Compute area & perimeter using turf.js
-      let area = 0;
-      let perimeter = 0;
-      try {
-        const feature = turf.feature(geometry);
-        area = turf.area(feature); // m²
-        perimeter = Number(
-          (turf.length(feature, { units: 'kilometers' }) * 1000).toFixed(2),
-        ); // meters
-      } catch {
-        throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_INVALID);
-      }
-  
-      const imageUrls = images?.length
-        ? images.map((file) => `/uploads/parcels/${file.filename}`)
-        : undefined;
-
-      // 3️⃣ Create Parcel entity
-    const parcelData: DeepPartial<Parcel> = {
-      name: dto.name,
-      description: dto.description,
-      titleNumber: dto.titleNumber,
-      geometry,
-      area,
-      perimeter,
-      population: dto.population,
-      status: dto.status ?? ParcelStatus.AVAILABLE,
-      createdBy: { id: user.id } as DeepPartial<User>,
-      owner: undefined,
-      imageUrls,
-      shapefileUrl: shapefile ? `/uploads/parcels/${shapefile.filename}` : undefined,
-    };
-    const parcel = this.parcelRepository.create(parcelData);
-  
-      // 4️⃣ Save to DB
-      try {
-        const saved = await this.parcelRepository.save(parcel);
-        return { message: PARCEL_MESSAGES.CREATED, data: saved };
-      } catch (error) {
-        throw new InternalServerErrorException(PARCEL_MESSAGES.CREATE_FAILED);
-      }
-    }
 
     // ──────────────────────────────── FIND ALL PARCELS ────────────────────────────────
     async findAll(options?: { asGeoJson?: boolean; status?: ParcelStatus }) {
@@ -226,18 +216,10 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
         // 2️⃣ If shapefile was uploaded, parse and replace geometry
         if (!newGeometry && shapefile) {
         const filePath = path.join(process.cwd(), 'uploads/parcels', shapefile.filename);
-        try {
-            const fileBuffer = fs.readFileSync(filePath);
-            const geojson = await shp(fileBuffer);
-            if (!geojson.features?.length) {
-            throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_EMPTY);
-            }
-            newGeometry = geojson.features[0].geometry;
-            geometryWasUpdated = true;
-            parcel.shapefileUrl = `/uploads/parcels/${shapefile.filename}`;
-        } catch (error) {
-            throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_PARSE_ERROR);
-        }
+        const fileBuffer = fs.readFileSync(filePath);
+        newGeometry = await parseGeometryFile(fileBuffer, shapefile.originalname);
+        geometryWasUpdated = true;
+        parcel.shapefileUrl = `/uploads/parcels/${shapefile.filename}`;
         }
 
         // 3️⃣ If geometry was sent directly in body, update it

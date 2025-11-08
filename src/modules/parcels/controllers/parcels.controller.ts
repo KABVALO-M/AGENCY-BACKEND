@@ -54,7 +54,7 @@ export class ParcelsController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
-      'Parcel details plus optional `images` (multiple) and `shapefile` uploads (zipped shapefile).',
+      'Parcel details plus optional `images` (multiple) and `shapefile` uploads (.zip Shapefile, .kml, .kmz, or .geojson).',
     schema: {
       type: 'object',
       properties: {
@@ -86,7 +86,11 @@ export class ParcelsController {
           type: 'array',
           items: { type: 'string', format: 'binary' },
         },
-        shapefile: { type: 'string', format: 'binary' },
+        shapefile: {
+          type: 'string',
+          format: 'binary',
+          description: 'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
+        },
       },
       required: ['name'],
     },
@@ -199,7 +203,7 @@ export class ParcelsController {
   @ApiOperation({
     summary: 'Update a parcel record',
     description:
-      'Allows partial updates. You can update metadata, upload additional images, or upload a new shapefile to replace geometry. Use deleteOldImage=true to replace existing images instead of appending.',
+      'Allows partial updates. You can update metadata, upload additional images, or upload a new Geo file (.zip/.kml/.kmz/.geojson) to replace geometry. Use deleteOldImage=true to replace existing images instead of appending.',
   })
   @ApiParam({
     name: 'id',
@@ -209,7 +213,7 @@ export class ParcelsController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
-      'Any subset of parcel fields, plus optional new images/shapefile and deleteOldImage flag.',
+      'Any subset of parcel fields, plus optional new images/geo file (.zip/.kml/.kmz/.geojson) and deleteOldImage flag.',
     schema: {
       type: 'object',
       properties: {
@@ -238,7 +242,11 @@ export class ParcelsController {
           type: 'array',
           items: { type: 'string', format: 'binary' },
         },
-        shapefile: { type: 'string', format: 'binary' },
+        shapefile: {
+          type: 'string',
+          format: 'binary',
+          description: 'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
+        },
       },
     },
   })

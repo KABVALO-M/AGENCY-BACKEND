@@ -29,12 +29,14 @@
     "@nestjs/platform-express": "^11.1.8",
     "@nestjs/swagger": "^11.2.1",
     "@nestjs/typeorm": "^11.0.0",
+    "@tmcw/togeojson": "^7.1.2",
     "@turf/turf": "^7.2.0",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "jszip": "^3.10.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
@@ -45,7 +47,9 @@
     "rxjs": "^7.8.2",
     "shpjs": "^6.2.0",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.27"
+    "togeojson": "^0.16.0",
+    "typeorm": "^0.3.27",
+    "xmldom": "^0.6.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
