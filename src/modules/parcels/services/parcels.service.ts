@@ -11,6 +11,7 @@ import { CreateParcelDto } from '../dtos/request/create-parcel.dto';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import type { User } from '../../users/entities/user.entity';
 import { PARCEL_MESSAGES } from '../messages/parcel.messages';
+import { ParcelStatus } from '../constants/parcel-status.constant';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as turf from '@turf/turf';
@@ -73,7 +74,7 @@ import shp from 'shpjs';
       area,
       perimeter,
       population: dto.population,
-      status: dto.status ?? 'available',
+      status: dto.status ?? ParcelStatus.AVAILABLE,
       createdBy: { id: user.id } as DeepPartial<User>,
       owner: undefined,
       imageUrl: image ? `/uploads/parcels/${image.filename}` : undefined,
@@ -89,5 +90,66 @@ import shp from 'shpjs';
         throw new InternalServerErrorException(PARCEL_MESSAGES.CREATE_FAILED);
       }
     }
+
+    // ──────────────────────────────── FIND ALL PARCELS ────────────────────────────────
+    async findAll(options?: { asGeoJson?: boolean; status?: ParcelStatus }) {
+        const { asGeoJson = false, status } = options || {};
+    
+        // Base query builder
+        const query = this.parcelRepository
+        .createQueryBuilder('parcel')
+        .leftJoinAndSelect('parcel.createdBy', 'createdBy')
+        .leftJoinAndSelect('parcel.owner', 'owner')
+        .orderBy('parcel.createdAt', 'DESC');
+    
+        if (status) {
+        query.andWhere('parcel.status = :status', { status });
+        }
+    
+        const parcels = await query.getMany();
+    
+        // If no parcels
+        if (!parcels.length) {
+        return asGeoJson
+            ? { type: 'FeatureCollection', features: [] }
+            : [];
+        }
+    
+        // Transform to GeoJSON format if requested
+        if (asGeoJson) {
+        const features = parcels.map((parcel) => ({
+            type: 'Feature',
+            geometry: parcel.geometry,
+            properties: {
+            id: parcel.id,
+            name: parcel.name,
+            description: parcel.description,
+            titleNumber: parcel.titleNumber,
+            area: parcel.area,
+            perimeter: parcel.perimeter,
+            population: parcel.population,
+            imageUrl: parcel.imageUrl,
+            shapefileUrl: parcel.shapefileUrl,
+            status: parcel.status,
+            createdBy: parcel.createdBy
+                ? `${parcel.createdBy.firstName} ${parcel.createdBy.lastName}`
+                : null,
+            owner: parcel.owner
+                ? `${parcel.owner.firstName} ${parcel.owner.lastName}`
+                : null,
+            createdAt: parcel.createdAt,
+            },
+        }));
+    
+        return {
+            type: 'FeatureCollection',
+            features,
+        };
+        }
+    
+        // Default JSON format
+        return parcels;
+    }
+    
   }
   

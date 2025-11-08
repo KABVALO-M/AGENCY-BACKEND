@@ -7,7 +7,8 @@ import {
     ManyToOne,
     JoinColumn,
   } from 'typeorm';
-  import { User } from '../../users/entities/user.entity';
+import { User } from '../../users/entities/user.entity';
+import { ParcelStatus } from '../constants/parcel-status.constant';
   
   @Entity('parcels')
   export class Parcel {
@@ -49,8 +50,12 @@ import {
     @Column({ nullable: true })
     shapefileUrl?: string;
   
-    @Column({ default: 'available' })
-    status: string;
+    @Column({
+      type: 'enum',
+      enum: ParcelStatus,
+      default: ParcelStatus.AVAILABLE,
+    })
+    status: ParcelStatus;
   
     @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
     area?: number;

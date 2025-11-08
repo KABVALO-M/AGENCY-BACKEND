@@ -4,9 +4,11 @@ import {
   IsString,
   IsNumber,
   IsObject,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ParcelStatus } from '../../constants/parcel-status.constant';
 
 export class CreateParcelDto {
   @ApiProperty({
@@ -64,10 +66,11 @@ export class CreateParcelDto {
 
   @ApiPropertyOptional({
     description: 'Workflow status of the parcel',
-    example: 'available',
-    default: 'available',
+    enum: ParcelStatus,
+    example: ParcelStatus.AVAILABLE,
+    default: ParcelStatus.AVAILABLE,
   })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(ParcelStatus)
+  status?: ParcelStatus;
 }
