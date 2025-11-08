@@ -14,6 +14,7 @@ import {
   ParseBoolPipe,
   Patch,
   Delete,
+  Logger,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -40,6 +41,8 @@ import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
 @ApiBearerAuth()
 @Controller('parcels')
 export class ParcelsController {
+  private readonly logger = new Logger(ParcelsController.name);
+
   constructor(private readonly parcelsService: ParcelsService) {}
 
   // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
@@ -123,6 +126,23 @@ export class ParcelsController {
   ) {
     const images = files?.images;
     const shapefile = files?.shapefile?.[0];
+
+    this.logger.debug(
+      `Create parcel payload: ${JSON.stringify({
+        dto: {
+          name: dto.name,
+          hasGeometry: Boolean(dto.geometry),
+          status: dto.status,
+          population: dto.population,
+        },
+        files: {
+          imageCount: images?.length ?? 0,
+          hasShapefile: Boolean(shapefile),
+          shapefileName: shapefile?.originalname ?? null,
+        },
+      })}`,
+    );
+
     return this.parcelsService.create(dto, user, images, shapefile);
   }
 

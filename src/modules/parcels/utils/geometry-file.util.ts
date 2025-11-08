@@ -3,7 +3,6 @@ import { FeatureCollection, Geometry } from 'geojson';
 import { DOMParser } from 'xmldom';
 import JSZip from 'jszip';
 import * as toGeoJSON from '@tmcw/togeojson';
-import shp from 'shpjs';
 import * as path from 'path';
 import { PARCEL_MESSAGES } from '../messages/parcel.messages';
 
@@ -28,7 +27,8 @@ export async function parseGeometryFile(
 
   try {
     if (ext === '.zip' || ext === '.shp') {
-      return extractGeometryFromGeoJson(await shp(fileBuffer), PARCEL_MESSAGES.SHAPEFILE_EMPTY);
+      const shpParser = await loadShapefileParser();
+      return extractGeometryFromGeoJson(await shpParser(fileBuffer), PARCEL_MESSAGES.SHAPEFILE_EMPTY);
     }
 
     if (ext === '.kml') {
@@ -46,7 +46,9 @@ export async function parseGeometryFile(
     if (error instanceof BadRequestException) {
       throw error;
     }
-    throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_PARSE_ERROR);
+    const details = error instanceof Error ? error.message : String(error);
+    console.error('Geometry parse error', { ext, details });
+    throw new BadRequestException(`${PARCEL_MESSAGES.GEOMETRY_PARSE_ERROR}: ${details}`);
   }
 }
 
@@ -104,4 +106,51 @@ function extractGeometryFromGeoJson(
   }
 
   throw new BadRequestException(emptyMessage);
+}
+
+type ShapefileParser = (input: ArrayBuffer | Buffer | Blob | string) => Promise<any>;
+let shapefileParserPromise: Promise<ShapefileParser> | null = null;
+
+async function loadShapefileParser(): Promise<ShapefileParser> {
+  if (!shapefileParserPromise) {
+    shapefileParserPromise = (async () => {
+      try {
+        // Import the entire shpjs module
+        const shpjs = await import('shpjs');
+        
+        // Handle different export patterns
+        // shpjs might export as default, named export, or direct function
+        let parser: any;
+        
+        if (typeof shpjs === 'function') {
+          parser = shpjs;
+        } else if (typeof (shpjs as any).default === 'function') {
+          parser = (shpjs as any).default;
+        } else if (typeof (shpjs as any).parseZip === 'function') {
+          parser = (shpjs as any).parseZip;
+        } else {
+          // Last resort: find the first function export
+          const functionExport = Object.values(shpjs).find(exp => typeof exp === 'function');
+          if (functionExport) {
+            parser = functionExport;
+          }
+        }
+        
+        if (!parser || typeof parser !== 'function') {
+          throw new Error('Could not find valid parser function in shpjs module');
+        }
+        
+        return parser as ShapefileParser;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('Failed to load shpjs:', errorMsg);
+        throw new Error(
+          `Failed to load shapefile parser. Error: ${errorMsg}. ` +
+          'Please ensure shpjs is properly installed: npm install shpjs@latest'
+        );
+      }
+    })();
+  }
+
+  return shapefileParserPromise;
 }
