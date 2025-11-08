@@ -10,15 +10,19 @@ import {
   Get,
   Query,
   ParseEnumPipe,
+  Param,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -30,6 +34,7 @@ import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type
 import { ParcelStatus } from '../constants/parcel-status.constant';
 
 @ApiTags('Parcels')
+@ApiBearerAuth()
 @Controller('parcels')
 export class ParcelsController {
   constructor(private readonly parcelsService: ParcelsService) {}
@@ -138,11 +143,46 @@ export class ParcelsController {
     description: 'Returns a list of all parcels or GeoJSON FeatureCollection.',
   })
   async findAll(
-    @Query('asGeoJson') asGeoJson?: string,
+    @Query('asGeoJson', new ParseBoolPipe({ optional: true }))
+    asGeoJson?: boolean,
     @Query('status', new ParseEnumPipe(ParcelStatus, { optional: true }))
     status?: ParcelStatus,
   ) {
-    const geo = asGeoJson === 'true';
+    const geo = asGeoJson ?? false;
     return this.parcelsService.findAll({ asGeoJson: geo, status });
+  }
+
+  // ──────────────────────────────── GET ONE PARCEL ────────────────────────────────
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Retrieve a parcel by its ID',
+    description:
+      'Returns a single parcel record. Use `?asGeoJson=true` to receive GeoJSON format.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    description: 'Parcel UUID',
+    example: '07cf1b52-fb4d-46e8-8c4a-b29a4ab2dfee',
+  })
+  @ApiQuery({
+    name: 'asGeoJson',
+    required: false,
+    type: Boolean,
+    description: 'If true, returns parcel geometry as GeoJSON feature',
+    example: false,
+  })
+  @ApiOkResponse({
+    description: 'Returns parcel details or GeoJSON feature.',
+  })
+  async findOne(
+    @Param('id') id: string,
+    @Query('asGeoJson', new ParseBoolPipe({ optional: true }))
+    asGeoJson?: boolean,
+  ) {
+    const geo = asGeoJson ?? false;
+    return this.parcelsService.findOne(id, geo);
   }
 }

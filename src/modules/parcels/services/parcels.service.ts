@@ -151,5 +151,49 @@ import shp from 'shpjs';
         return parcels;
     }
     
+    // ──────────────────────────────── FIND ONE PARCEL ────────────────────────────────
+    async findOne(id: string, asGeoJson = false): Promise<any> {
+        // Find parcel with related entities
+        const parcel = await this.parcelRepository.findOne({
+        where: { id },
+        relations: ['createdBy', 'owner'],
+        });
+    
+        if (!parcel) {
+        throw new BadRequestException(PARCEL_MESSAGES.NOT_FOUND);
+        }
+    
+        // If GeoJSON output is requested
+        if (asGeoJson) {
+        return {
+            type: 'Feature',
+            geometry: parcel.geometry,
+            properties: {
+            id: parcel.id,
+            name: parcel.name,
+            description: parcel.description,
+            titleNumber: parcel.titleNumber,
+            area: parcel.area,
+            perimeter: parcel.perimeter,
+            population: parcel.population,
+            imageUrl: parcel.imageUrl,
+            shapefileUrl: parcel.shapefileUrl,
+            status: parcel.status,
+            createdBy: parcel.createdBy
+                ? `${parcel.createdBy.firstName} ${parcel.createdBy.lastName}`
+                : null,
+            owner: parcel.owner
+                ? `${parcel.owner.firstName} ${parcel.owner.lastName}`
+                : null,
+            createdAt: parcel.createdAt,
+            updatedAt: parcel.updatedAt,
+            },
+        };
+        }
+    
+        // Default JSON structure
+        return parcel;
+    }
+  
   }
   
