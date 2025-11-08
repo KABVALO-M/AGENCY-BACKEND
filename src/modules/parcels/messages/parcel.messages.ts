@@ -1,0 +1,11 @@
+export const PARCEL_MESSAGES = {
+    CREATED: 'Parcel created successfully.',
+    CREATE_FAILED: 'Failed to create parcel.',
+    GEOMETRY_REQUIRED: 'Geometry or shapefile must be provided.',
+    GEOMETRY_INVALID: 'Invalid geometry format.',
+    SHAPEFILE_PARSE_ERROR: 'Failed to parse shapefile.',
+    SHAPEFILE_EMPTY: 'No features found in shapefile.',
+  } as const;
+  
+  export type ParcelMessageKey = keyof typeof PARCEL_MESSAGES;
+  

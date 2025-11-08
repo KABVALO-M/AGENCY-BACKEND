@@ -25,10 +25,6 @@ import {
     titleNumber?: string;
   
     // ─────────────── GEOMETRY ───────────────
-    /**
-     * Store the polygon geometry (GeoJSON or coordinates)
-     * SRID 4326 = GPS coordinate standard.
-     */
     @Column({
       type: 'geometry',
       spatialFeatureType: 'Polygon',
@@ -37,18 +33,11 @@ import {
     geometry: any;
   
     // ─────────────── OWNER RELATION ───────────────
-    /**
-     * The real owner of the plot.
-     * Can be linked to a user account representing a landowner or client.
-     */
     @ManyToOne(() => User, { eager: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'owner_id' })
     owner: User;
   
     // ─────────────── ADMIN CREATOR RELATION ───────────────
-    /**
-     * The admin who created this parcel record in the system.
-     */
     @ManyToOne(() => User, { eager: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'created_by_id' })
     createdBy: User;
@@ -57,11 +46,20 @@ import {
     @Column({ nullable: true })
     imageUrl?: string;
   
+    @Column({ nullable: true })
+    shapefileUrl?: string;
+  
     @Column({ default: 'available' })
     status: string;
   
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
     area?: number;
+  
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+    perimeter?: number;
+  
+    @Column({ type: 'int', nullable: true })
+    population?: number;
   
     // ─────────────── TIMESTAMPS ───────────────
     @CreateDateColumn()

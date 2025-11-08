@@ -1,49 +1,55 @@
 import {
     Controller,
-    Get,
     Post,
+    UseGuards,
+    UseInterceptors,
+    UploadedFiles,
     Body,
-    Param,
-    Patch,
-    Delete,
+    HttpCode,
+    HttpStatus,
   } from '@nestjs/common';
+  import { FileFieldsInterceptor } from '@nestjs/platform-express';
+  import { diskStorage } from 'multer';
   import { ParcelsService } from '../services/parcels.service';
   import { CreateParcelDto } from '../dtos/request/create-parcel.dto';
-  import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
+  import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+  import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
   
   @Controller('parcels')
   export class ParcelsController {
     constructor(private readonly parcelsService: ParcelsService) {}
   
-    // ──────────────────────────────── CREATE PARCEL
+    // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
     @Post()
-    async create(@Body() data: CreateParcelDto) {
-      return this.parcelsService.create(data);
-    }
-  
-    // ──────────────────────────────── GET ALL PARCELS
-    @Get()
-    async findAll() {
-      return this.parcelsService.findAll();
-    }
-  
-    // ──────────────────────────────── GET ONE PARCEL
-    @Get(':id')
-    async findOne(@Param('id') id: string) {
-      return this.parcelsService.findOne(id);
-    }
-  
-    // ──────────────────────────────── UPDATE PARCEL
-    @Patch(':id')
-    async update(@Param('id') id: string, @Body() data: UpdateParcelDto) {
-      return this.parcelsService.update(id, data);
-    }
-  
-    // ──────────────────────────────── DELETE PARCEL
-    @Delete(':id')
-    async remove(@Param('id') id: string) {
-      await this.parcelsService.remove(id);
-      return { message: 'Parcel deleted successfully' };
+    @UseGuards(JwtAuthGuard)
+    @HttpCode(HttpStatus.CREATED)
+    @UseInterceptors(
+      FileFieldsInterceptor(
+        [
+          { name: 'image', maxCount: 1 },
+          { name: 'shapefile', maxCount: 1 },
+        ],
+        {
+          storage: diskStorage({
+            destination: './uploads/parcels',
+            filename: (_req, file, cb) => {
+              const unique = `${Date.now()}-${file.originalname}`;
+              cb(null, unique);
+            },
+          }),
+        },
+      ),
+    )
+    async create(
+      @CurrentUser() user: AuthenticatedUser,
+      @UploadedFiles()
+      files: { image?: Express.Multer.File[]; shapefile?: Express.Multer.File[] },
+      @Body() dto: CreateParcelDto,
+    ) {
+      const image = files?.image?.[0];
+      const shapefile = files?.shapefile?.[0];
+      return this.parcelsService.create(dto, user, image, shapefile);
     }
   }
   
