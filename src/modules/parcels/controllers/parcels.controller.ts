@@ -12,6 +12,7 @@ import {
   ParseEnumPipe,
   Param,
   ParseBoolPipe,
+  Patch,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -32,6 +33,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { ParcelStatus } from '../constants/parcel-status.constant';
+import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
 
 @ApiTags('Parcels')
 @ApiBearerAuth()
@@ -51,7 +53,7 @@ export class ParcelsController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
-      'Parcel details plus optional `image` and `shapefile` uploads (zipped shapefile).',
+      'Parcel details plus optional `images` (multiple) and `shapefile` uploads (zipped shapefile).',
     schema: {
       type: 'object',
       properties: {
@@ -79,7 +81,10 @@ export class ParcelsController {
           enum: Object.values(ParcelStatus),
           example: ParcelStatus.AVAILABLE,
         },
-        image: { type: 'string', format: 'binary' },
+        images: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
         shapefile: { type: 'string', format: 'binary' },
       },
       required: ['name'],
@@ -91,7 +96,7 @@ export class ParcelsController {
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        { name: 'image', maxCount: 1 },
+        { name: 'images', maxCount: 5 },
         { name: 'shapefile', maxCount: 1 },
       ],
       {
@@ -108,12 +113,12 @@ export class ParcelsController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFiles()
-    files: { image?: Express.Multer.File[]; shapefile?: Express.Multer.File[] },
+    files: { images?: Express.Multer.File[]; shapefile?: Express.Multer.File[] },
     @Body() dto: CreateParcelDto,
   ) {
-    const image = files?.image?.[0];
+    const images = files?.images;
     const shapefile = files?.shapefile?.[0];
-    return this.parcelsService.create(dto, user, image, shapefile);
+    return this.parcelsService.create(dto, user, images, shapefile);
   }
 
   // ──────────────────────────────── FIND ALL PARCELS ────────────────────────────────
@@ -184,5 +189,90 @@ export class ParcelsController {
   ) {
     const geo = asGeoJson ?? false;
     return this.parcelsService.findOne(id, geo);
+  }
+
+  // ──────────────────────────────── UPDATE/PATCH PARCEL ────────────────────────────────
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update a parcel record',
+    description:
+      'Allows partial updates. You can update metadata, upload additional images, or upload a new shapefile to replace geometry. Use deleteOldImage=true to replace existing images instead of appending.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    description: 'Parcel UUID',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description:
+      'Any subset of parcel fields, plus optional new images/shapefile and deleteOldImage flag.',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Updated Parcel 17' },
+        description: { type: 'string' },
+        titleNumber: { type: 'string' },
+        status: { type: 'string', example: 'available' },
+        population: { type: 'number', example: 4100 },
+        geometry: {
+          type: 'object',
+          example: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [30.121, -1.951],
+                [30.122, -1.951],
+                [30.122, -1.952],
+                [30.121, -1.952],
+                [30.121, -1.951],
+              ],
+            ],
+          },
+        },
+        deleteOldImage: { type: 'boolean', example: true },
+        images: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
+        shapefile: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOkResponse({
+    description: 'Returns the updated parcel.',
+  })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'images', maxCount: 5 },
+        { name: 'shapefile', maxCount: 1 },
+      ],
+      {
+        storage: diskStorage({
+          destination: './uploads/parcels',
+          filename: (_req, file, cb) => {
+            const unique = `${Date.now()}-${file.originalname}`;
+            cb(null, unique);
+          },
+        }),
+      },
+    ),
+  )
+  async update(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFiles()
+    files: {
+      images?: Express.Multer.File[];
+      shapefile?: Express.Multer.File[];
+    },
+    @Body() dto: UpdateParcelDto,
+  ) {
+    const images = files?.images;
+    const shapefile = files?.shapefile?.[0];
+    return this.parcelsService.update(id, dto, user, images, shapefile);
   }
 }

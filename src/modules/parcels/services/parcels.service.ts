@@ -3,6 +3,7 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeepPartial } from 'typeorm';
@@ -16,6 +17,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as turf from '@turf/turf';
 import shp from 'shpjs';
+import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
   
   @Injectable()
   export class ParcelsService {
@@ -28,7 +30,7 @@ import shp from 'shpjs';
     async create(
       dto: CreateParcelDto,
       user: AuthenticatedUser,
-      image?: Express.Multer.File,
+      images?: Express.Multer.File[],
       shapefile?: Express.Multer.File,
     ): Promise<{ message: string; data: Parcel }> {
       let geometry = dto.geometry;
@@ -65,6 +67,10 @@ import shp from 'shpjs';
         throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_INVALID);
       }
   
+      const imageUrls = images?.length
+        ? images.map((file) => `/uploads/parcels/${file.filename}`)
+        : undefined;
+
       // 3️⃣ Create Parcel entity
     const parcelData: DeepPartial<Parcel> = {
       name: dto.name,
@@ -77,7 +83,7 @@ import shp from 'shpjs';
       status: dto.status ?? ParcelStatus.AVAILABLE,
       createdBy: { id: user.id } as DeepPartial<User>,
       owner: undefined,
-      imageUrl: image ? `/uploads/parcels/${image.filename}` : undefined,
+      imageUrls,
       shapefileUrl: shapefile ? `/uploads/parcels/${shapefile.filename}` : undefined,
     };
     const parcel = this.parcelRepository.create(parcelData);
@@ -128,7 +134,7 @@ import shp from 'shpjs';
             area: parcel.area,
             perimeter: parcel.perimeter,
             population: parcel.population,
-            imageUrl: parcel.imageUrl,
+            imageUrls: parcel.imageUrls,
             shapefileUrl: parcel.shapefileUrl,
             status: parcel.status,
             createdBy: parcel.createdBy
@@ -176,7 +182,7 @@ import shp from 'shpjs';
             area: parcel.area,
             perimeter: parcel.perimeter,
             population: parcel.population,
-            imageUrl: parcel.imageUrl,
+            imageUrls: parcel.imageUrls,
             shapefileUrl: parcel.shapefileUrl,
             status: parcel.status,
             createdBy: parcel.createdBy
@@ -193,6 +199,107 @@ import shp from 'shpjs';
     
         // Default JSON structure
         return parcel;
+    }
+
+     // ──────────────────────────────── UPDATE PARCEL ────────────────────────────────
+    async update(
+        id: string,
+        dto: UpdateParcelDto,
+        _user: AuthenticatedUser,
+        images?: Express.Multer.File[],
+        shapefile?: Express.Multer.File,
+    ): Promise<{ message: string; data: Parcel }> {
+        // 1️⃣ Load existing parcel
+        const parcel = await this.parcelRepository.findOne({
+        where: { id },
+        relations: ['createdBy', 'owner'],
+        });
+
+        if (!parcel) {
+        throw new NotFoundException(PARCEL_MESSAGES.NOT_FOUND);
+        }
+
+        let geometryWasUpdated = false;
+        let newGeometry = dto.geometry;
+
+        // 2️⃣ If shapefile was uploaded, parse and replace geometry
+        if (!newGeometry && shapefile) {
+        const filePath = path.join(process.cwd(), 'uploads/parcels', shapefile.filename);
+        try {
+            const fileBuffer = fs.readFileSync(filePath);
+            const geojson = await shp(fileBuffer);
+            if (!geojson.features?.length) {
+            throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_EMPTY);
+            }
+            newGeometry = geojson.features[0].geometry;
+            geometryWasUpdated = true;
+            parcel.shapefileUrl = `/uploads/parcels/${shapefile.filename}`;
+        } catch (error) {
+            throw new BadRequestException(PARCEL_MESSAGES.SHAPEFILE_PARSE_ERROR);
+        }
+        }
+
+        // 3️⃣ If geometry was sent directly in body, update it
+        if (newGeometry) {
+        // validate & compute
+        try {
+            const feature = turf.feature(newGeometry);
+            const area = turf.area(feature);
+            const perimeter = Number(
+            (turf.length(feature, { units: 'kilometers' }) * 1000).toFixed(2),
+            );
+
+            parcel.geometry = newGeometry;
+            parcel.area = area;
+            parcel.perimeter = perimeter;
+            geometryWasUpdated = true;
+        } catch {
+            throw new BadRequestException(PARCEL_MESSAGES.GEOMETRY_INVALID);
+        }
+        }
+
+        // 4️⃣ Update simple scalar fields
+        if (dto.name !== undefined) parcel.name = dto.name;
+        if (dto.description !== undefined) parcel.description = dto.description;
+        if (dto.titleNumber !== undefined) parcel.titleNumber = dto.titleNumber;
+        if (dto.population !== undefined) parcel.population = dto.population;
+        if (dto.status !== undefined) parcel.status = dto.status;
+
+        // (optional) future: if you add owner_id to dto, set parcel.owner = {id: ...}
+
+        // 5️⃣ Handle image upload + optional deletion of old image
+        if (images?.length) {
+        const newImageUrls = images.map(
+            (file) => `/uploads/parcels/${file.filename}`,
+        );
+        const wantsDelete = Boolean(dto.deleteOldImage);
+        const existingImages = parcel.imageUrls ?? [];
+
+        if (wantsDelete && existingImages.length) {
+            // Delete existing files before replacing references
+            existingImages.forEach((imagePath) => {
+            const absolute = path.join(
+                process.cwd(),
+                imagePath.replace(/^\//, ''),
+            );
+            fs.promises
+                .stat(absolute)
+                .then(() => fs.promises.unlink(absolute))
+                .catch(() => undefined);
+            });
+            parcel.imageUrls = newImageUrls;
+        } else {
+            parcel.imageUrls = [...existingImages, ...newImageUrls];
+        }
+        }
+
+        // 6️⃣ Save updates
+        try {
+        const saved = await this.parcelRepository.save(parcel);
+        return { message: PARCEL_MESSAGES.UPDATED, data: saved };
+        } catch (error) {
+        throw new InternalServerErrorException(PARCEL_MESSAGES.UPDATE_FAILED);
+        }
     }
   
   }
