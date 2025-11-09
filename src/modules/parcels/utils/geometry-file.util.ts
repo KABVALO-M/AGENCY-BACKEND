@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { FeatureCollection, Geometry } from 'geojson';
+import { FeatureCollection, Geometry, MultiPolygon, MultiLineString, MultiPoint } from 'geojson';
 import { DOMParser } from 'xmldom';
 import JSZip from 'jszip';
 import * as toGeoJSON from '@tmcw/togeojson';
@@ -38,7 +38,7 @@ export async function parseGeometryFile(
         type: geojson?.type, 
         featureCount: geojson?.features?.length 
       });
-      return extractGeometryFromGeoJson(geojson, PARCEL_MESSAGES.SHAPEFILE_EMPTY);
+      return extractAndCombineGeometries(geojson, PARCEL_MESSAGES.SHAPEFILE_EMPTY);
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -50,12 +50,10 @@ export async function parseGeometryFile(
   }
 
   if (ext === '.kml') {
-    // KML parsing handles its own errors internally
     return parseKmlString(fileBuffer.toString());
   }
 
   if (ext === '.kmz') {
-    // KMZ parsing handles its own errors internally
     return await parseKmzBuffer(fileBuffer);
   }
 
@@ -66,7 +64,7 @@ export async function parseGeometryFile(
       type: geojson?.type, 
       featureCount: geojson?.features?.length 
     });
-    return extractGeometryFromGeoJson(geojson, PARCEL_MESSAGES.GEOJSON_EMPTY);
+    return extractAndCombineGeometries(geojson, PARCEL_MESSAGES.GEOJSON_EMPTY);
   } catch (error) {
     if (error instanceof BadRequestException) {
       throw error;
@@ -107,7 +105,7 @@ async function parseZipContainer(buffer: Buffer): Promise<Geometry> {
     if (lowered.some((name) => name.endsWith('.shp'))) {
       const shpParser = await loadShapefileParser();
       const geojson = await shpParser(buffer);
-      return extractGeometryFromGeoJson(geojson, PARCEL_MESSAGES.SHAPEFILE_EMPTY);
+      return extractAndCombineGeometries(geojson, PARCEL_MESSAGES.SHAPEFILE_EMPTY);
     }
 
     const kmlIndex = lowered.findIndex((name) => name.endsWith('.kml'));
@@ -122,7 +120,7 @@ async function parseZipContainer(buffer: Buffer): Promise<Geometry> {
     if (geojsonIndex !== -1) {
       const content = await zip.files[entries[geojsonIndex]].async('string');
       const geojson = JSON.parse(content);
-      return extractGeometryFromGeoJson(geojson, PARCEL_MESSAGES.GEOJSON_EMPTY);
+      return extractAndCombineGeometries(geojson, PARCEL_MESSAGES.GEOJSON_EMPTY);
     }
 
     throw new BadRequestException(PARCEL_MESSAGES.FILE_UNSUPPORTED);
@@ -139,13 +137,11 @@ async function parseZipContainer(buffer: Buffer): Promise<Geometry> {
 function parseKmlString(kmlContent: string): Geometry {
   const xml = new DOMParser().parseFromString(kmlContent, 'text/xml');
   
-  // Check for parsing errors
   const parseError = xml.getElementsByTagName('parsererror');
   if (parseError.length > 0) {
     throw new BadRequestException('Invalid KML file: XML parsing failed');
   }
   
-  // Debug: Log KML structure
   const placemarks = xml.getElementsByTagName('Placemark');
   console.log('KML Debug:', {
     placemarks: placemarks.length,
@@ -153,10 +149,8 @@ function parseKmlString(kmlContent: string): Geometry {
     folders: xml.getElementsByTagName('Folder').length
   });
   
-  // Always try manual parsing first (more reliable)
   let geojson: any;
   
-  // If no placemarks, try toGeoJSON (it might handle other structures)
   if (placemarks.length === 0) {
     console.log('No placemarks found, trying toGeoJSON...');
     try {
@@ -169,29 +163,22 @@ function parseKmlString(kmlContent: string): Geometry {
       );
     }
   } else {
-    // We have placemarks, parse manually
     console.log('Found placemarks, using manual parser...');
     try {
       geojson = parseKmlManually(xml);
       console.log('Manual parsing succeeded');
     } catch (manualError) {
       const manualMsg = manualError instanceof Error ? manualError.message : String(manualError);
-      
-      // Fallback to toGeoJSON if manual parsing fails
       console.log('Manual parsing failed, trying toGeoJSON...');
       try {
         geojson = toGeoJSON.kml(xml);
         console.log('toGeoJSON succeeded as fallback');
       } catch (toGeoJsonError) {
-        // Both failed, throw the manual parsing error (more specific)
-        throw new BadRequestException(
-          `Failed to parse KML file: ${manualMsg}`
-        );
+        throw new BadRequestException(`Failed to parse KML file: ${manualMsg}`);
       }
     }
   }
   
-  // Additional validation
   if (!geojson) {
     throw new BadRequestException('KML file contains no valid geographic data');
   }
@@ -201,7 +188,7 @@ function parseKmlString(kmlContent: string): Geometry {
     featureCount: geojson.features?.length
   });
   
-  return extractGeometryFromGeoJson(geojson, PARCEL_MESSAGES.KML_EMPTY);
+  return extractAndCombineGeometries(geojson, PARCEL_MESSAGES.KML_EMPTY);
 }
 
 function parseKmlManually(xml: Document): any {
@@ -218,7 +205,6 @@ function parseKmlManually(xml: Document): any {
     const nameNode = placemark.getElementsByTagName('name')[0];
     const name = nameNode?.textContent?.trim() || `Feature ${i + 1}`;
     
-    // Try to find coordinates
     const coordinatesNodes = placemark.getElementsByTagName('coordinates');
     if (coordinatesNodes.length === 0) {
       console.warn(`Placemark "${name}" has no coordinates`);
@@ -231,7 +217,6 @@ function parseKmlManually(xml: Document): any {
       continue;
     }
     
-    // Parse coordinates (format: lon,lat,alt lon,lat,alt ...)
     const coordPairs = coordsText
       .split(/\s+/)
       .filter(s => s.trim())
@@ -247,14 +232,12 @@ function parseKmlManually(xml: Document): any {
       continue;
     }
     
-    // Determine geometry type based on KML elements
     let geometry: any;
     const hasPolygon = placemark.getElementsByTagName('Polygon').length > 0;
     const hasLineString = placemark.getElementsByTagName('LineString').length > 0;
     const hasPoint = placemark.getElementsByTagName('Point').length > 0;
     
     if (hasPolygon) {
-      // For polygons, coordinates should be closed ring
       if (coordPairs.length >= 4) {
         geometry = {
           type: 'Polygon',
@@ -275,7 +258,6 @@ function parseKmlManually(xml: Document): any {
         coordinates: coordPairs[0]
       };
     } else {
-      // Auto-detect based on coordinate count
       if (coordPairs.length === 1) {
         geometry = { type: 'Point', coordinates: coordPairs[0] };
       } else if (coordPairs.length >= 4) {
@@ -304,7 +286,15 @@ function parseKmlManually(xml: Document): any {
   };
 }
 
-function extractGeometryFromGeoJson(
+/**
+ * Extracts geometries from GeoJSON and combines multiple features into a single geometry
+ * - Single feature: returns its geometry as-is
+ * - Multiple Polygons: combines into MultiPolygon
+ * - Multiple LineStrings: combines into MultiLineString
+ * - Multiple Points: combines into MultiPoint
+ * - Mixed types: creates GeometryCollection
+ */
+function extractAndCombineGeometries(
   data: FeatureCollection | Geometry | { type?: string; features?: any[] },
   emptyMessage: string,
 ): Geometry {
@@ -327,23 +317,15 @@ function extractGeometryFromGeoJson(
       throw new BadRequestException('No valid geometries found in the file');
     }
     
-    // If multiple features, combine them into a GeometryCollection or use first one
-    if (validFeatures.length > 1) {
-      // For parcels, we typically want a single geometry
-      // You can either:
-      // 1. Take the first feature (current behavior)
-      // 2. Combine all features into a GeometryCollection
-      // 3. Throw an error asking user to select one
-      
-      console.warn(`File contains ${validFeatures.length} features. Using the first one.`);
+    // Single feature - return as-is
+    if (validFeatures.length === 1) {
+      console.log('Single feature found, using it directly');
+      return validFeatures[0].geometry;
     }
     
-    const geometry = validFeatures[0].geometry;
-    if (!geometry) {
-      throw new BadRequestException(emptyMessage);
-    }
-    
-    return geometry;
+    // Multiple features - combine them
+    console.log(`Combining ${validFeatures.length} features into a single parcel geometry`);
+    return combineGeometries(validFeatures.map(f => f.geometry));
   }
 
   // Handle single Feature
@@ -371,6 +353,61 @@ function extractGeometryFromGeoJson(
   throw new BadRequestException(emptyMessage);
 }
 
+/**
+ * Combines multiple geometries into a single geometry
+ * - Same type geometries: creates Multi* version (MultiPolygon, MultiLineString, MultiPoint)
+ * - Mixed types: creates GeometryCollection
+ */
+function combineGeometries(geometries: Geometry[]): Geometry {
+  if (geometries.length === 0) {
+    throw new BadRequestException('No geometries to combine');
+  }
+  
+  if (geometries.length === 1) {
+    return geometries[0];
+  }
+  
+  // Check if all geometries are of the same type
+  const types = new Set(geometries.map(g => g.type));
+  
+  // All Polygons -> MultiPolygon
+  if (types.size === 1 && types.has('Polygon')) {
+    const coordinates = geometries.map((g: any) => g.coordinates);
+    console.log(`Creating MultiPolygon from ${geometries.length} Polygons`);
+    return {
+      type: 'MultiPolygon',
+      coordinates
+    } as MultiPolygon;
+  }
+  
+  // All LineStrings -> MultiLineString
+  if (types.size === 1 && types.has('LineString')) {
+    const coordinates = geometries.map((g: any) => g.coordinates);
+    console.log(`Creating MultiLineString from ${geometries.length} LineStrings`);
+    return {
+      type: 'MultiLineString',
+      coordinates
+    } as MultiLineString;
+  }
+  
+  // All Points -> MultiPoint
+  if (types.size === 1 && types.has('Point')) {
+    const coordinates = geometries.map((g: any) => g.coordinates);
+    console.log(`Creating MultiPoint from ${geometries.length} Points`);
+    return {
+      type: 'MultiPoint',
+      coordinates
+    } as MultiPoint;
+  }
+  
+  // Mixed types or already Multi* types -> GeometryCollection
+  console.log(`Creating GeometryCollection from ${geometries.length} mixed geometries`);
+  return {
+    type: 'GeometryCollection',
+    geometries
+  };
+}
+
 type ShapefileParser = (input: ArrayBuffer | Buffer | Blob | string) => Promise<any>;
 let shapefileParserPromise: Promise<ShapefileParser> | null = null;
 
@@ -378,11 +415,8 @@ async function loadShapefileParser(): Promise<ShapefileParser> {
   if (!shapefileParserPromise) {
     shapefileParserPromise = (async () => {
       try {
-        // Import the entire shpjs module
         const shpjs = await import('shpjs');
         
-        // Handle different export patterns
-        // shpjs might export as default, named export, or direct function
         let parser: any;
         
         if (typeof shpjs === 'function') {
@@ -392,7 +426,6 @@ async function loadShapefileParser(): Promise<ShapefileParser> {
         } else if (typeof (shpjs as any).parseZip === 'function') {
           parser = (shpjs as any).parseZip;
         } else {
-          // Last resort: find the first function export
           const functionExport = Object.values(shpjs).find(exp => typeof exp === 'function');
           if (functionExport) {
             parser = functionExport;
