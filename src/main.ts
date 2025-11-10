@@ -10,6 +10,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
 import { Transport } from '@nestjs/microservices';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -73,6 +75,15 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
+  });
+
+  // ✅ Serve uploaded assets (e.g., parcel images) from /uploads
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.useStaticAssets(uploadsDir, {
+    prefix: '/uploads/',
   });
 
   // 📘 Swagger Docs
