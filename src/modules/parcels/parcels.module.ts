@@ -11,6 +11,8 @@ import { ParcelRiskAssessment } from './entities/parcel-risk-assessment.entity';
 import { ParcelLocationInsight } from './entities/parcel-location-insight.entity';
 import { MaterializedViewRefresh } from './entities/materialized-view-refresh.entity';
 import { ParcelSchemaService } from './services/parcel-schema.service';
+import { ParcelIngestionService } from './services/parcel-ingestion.service';
+import { EnvironmentalDataService } from './services/environmental-data.service';
 
 @Module({
   imports: [
@@ -26,7 +28,12 @@ import { ParcelSchemaService } from './services/parcel-schema.service';
     ]),
   ],
   controllers: [ParcelsController],
-  providers: [ParcelsService, ParcelSchemaService],
+  providers: [
+    ParcelsService,
+    ParcelSchemaService,
+    ParcelIngestionService,
+    EnvironmentalDataService,
+  ],
   exports: [ParcelsService],
 })
 export class ParcelsModule {}

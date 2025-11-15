@@ -37,6 +37,7 @@ import {
   PARCEL_MATERIALIZED_VIEWS,
   ParcelMaterializedView,
 } from '../constants/materialized-view.constant';
+import { ParcelIngestionService } from './parcel-ingestion.service';
   
   @Injectable()
   export class ParcelsService {
@@ -58,6 +59,7 @@ import {
       @InjectRepository(MaterializedViewRefresh)
       private readonly viewRefreshRepository: Repository<MaterializedViewRefresh>,
       private readonly parcelSchemaService: ParcelSchemaService,
+      private readonly parcelIngestionService: ParcelIngestionService,
     ) {}
 
     private async getParcelOrThrow(id: string): Promise<Parcel> {
@@ -126,6 +128,12 @@ import {
       
         try {
           const saved = await this.parcelRepository.save(parcel);
+          this.parcelIngestionService.enqueue(saved.id, {
+            reason: 'create',
+            user,
+            providedPopulation: dto.population,
+            geometryChanged: true,
+          });
           return { message: PARCEL_MESSAGES.CREATED, data: saved };
         } catch (error) {
           console.error("Parcel create error:", error);
@@ -242,7 +250,7 @@ import {
     async update(
         id: string,
         dto: UpdateParcelDto,
-        _user: AuthenticatedUser,
+        user: AuthenticatedUser,
         images?: Express.Multer.File[],
         shapefile?: Express.Multer.File,
     ): Promise<{ message: string; data: Parcel }> {
@@ -325,6 +333,14 @@ import {
         // 6️⃣ Save updates
         try {
         const saved = await this.parcelRepository.save(parcel);
+        const providedPopulation =
+          dto.population !== undefined ? dto.population : undefined;
+        this.parcelIngestionService.enqueue(saved.id, {
+          reason: 'update',
+          user,
+          providedPopulation,
+          geometryChanged: geometryWasUpdated,
+        });
         return { message: PARCEL_MESSAGES.UPDATED, data: saved };
         } catch (error) {
         throw new InternalServerErrorException(PARCEL_MESSAGES.UPDATE_FAILED);
