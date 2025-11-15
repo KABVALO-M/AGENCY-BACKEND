@@ -13,6 +13,7 @@ import { CommonModule } from './common/common.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmailWorkerModule } from './email-worker/email-worker.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // 🗺️ GIS Land Parcels Module
 import { ParcelsModule } from './modules/parcels/parcels.module';
@@ -21,6 +22,7 @@ import { ParcelsModule } from './modules/parcels/parcels.module';
   imports: [
     // 🌍 Environment variables (global)
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
 
     // 🗄️ Database connection (async factory)
     TypeOrmModule.forRootAsync({

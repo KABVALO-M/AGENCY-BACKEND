@@ -36,6 +36,13 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { ParcelStatus } from '../constants/parcel-status.constant';
 import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
+import { CreateParcelPopulationStatDto } from '../dtos/request/create-parcel-population-stat.dto';
+import { CreateParcelFacilityDto } from '../dtos/request/create-parcel-facility.dto';
+import { CreateParcelClimateMetricDto } from '../dtos/request/create-parcel-climate-metric.dto';
+import { UpsertParcelRiskInputDto } from '../dtos/request/upsert-parcel-risk-input.dto';
+import { CreateParcelRiskAssessmentDto } from '../dtos/request/create-parcel-risk-assessment.dto';
+import { CreateParcelLocationInsightDto } from '../dtos/request/create-parcel-location-insight.dto';
+import { RefreshMaterializedViewDto } from '../dtos/request/refresh-materialized-view.dto';
 
 @ApiTags('Parcels')
 @ApiBearerAuth()
@@ -182,6 +189,30 @@ export class ParcelsController {
     return this.parcelsService.findAll({ asGeoJson: geo, status });
   }
 
+  // ──────────────────────────────── MATERIALIZED VIEW STATUS ────────────────────────────────
+  @Get('materialized-views/status')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get materialized view statuses',
+    description: 'Lists the tracked parcel analytics materialized views and their last refresh metadata.',
+  })
+  async getMaterializedViewStatus() {
+    return this.parcelsService.getMaterializedViewStatuses();
+  }
+
+  // ──────────────────────────────── MATERIALIZED VIEW REFRESH ────────────────────────────────
+  @Post('materialized-views/refresh')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Trigger a materialized view refresh',
+    description: 'Refreshes the parcel analytics materialized views immediately.',
+  })
+  async refreshMaterializedViews(@Body() dto: RefreshMaterializedViewDto) {
+    return this.parcelsService.refreshMaterializedViews(dto);
+  }
+
   // ──────────────────────────────── GET ONE PARCEL ────────────────────────────────
   @Get(':id')
   @UseGuards(JwtAuthGuard)
@@ -324,5 +355,95 @@ export class ParcelsController {
   })
   async softDelete(@Param('id') id: string) {
     return this.parcelsService.softDelete(id);
+  }
+
+  // ──────────────────────────────── POPULATION STAT ────────────────────────────────
+  @Post(':id/population-stats')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Record a population statistic for a parcel',
+  })
+  async addPopulationStat(
+    @Param('id') id: string,
+    @Body() dto: CreateParcelPopulationStatDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.addPopulationStat(id, dto, user);
+  }
+
+  // ──────────────────────────────── FACILITY ────────────────────────────────
+  @Post(':id/facilities')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Attach a nearby facility to a parcel',
+  })
+  async addFacility(
+    @Param('id') id: string,
+    @Body() dto: CreateParcelFacilityDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.addFacility(id, dto, user);
+  }
+
+  // ──────────────────────────────── CLIMATE METRIC ────────────────────────────────
+  @Post(':id/climate-metrics')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Record climate/elevation metrics for a parcel',
+  })
+  async addClimateMetric(
+    @Param('id') id: string,
+    @Body() dto: CreateParcelClimateMetricDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.addClimateMetric(id, dto, user);
+  }
+
+  // ──────────────────────────────── RISK INPUT ────────────────────────────────
+  @Post(':id/risk-inputs')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Upsert a risk input metric for a parcel',
+  })
+  async upsertRiskInput(
+    @Param('id') id: string,
+    @Body() dto: UpsertParcelRiskInputDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.upsertRiskInput(id, dto, user);
+  }
+
+  // ──────────────────────────────── RISK ASSESSMENT ────────────────────────────────
+  @Post(':id/risk-assessments')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Store a computed risk assessment for a parcel',
+  })
+  async addRiskAssessment(
+    @Param('id') id: string,
+    @Body() dto: CreateParcelRiskAssessmentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.addRiskAssessment(id, dto, user);
+  }
+
+  // ──────────────────────────────── LOCATION INSIGHT ────────────────────────────────
+  @Post(':id/location-insights')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Record a narrative insight for the parcel',
+  })
+  async addLocationInsight(
+    @Param('id') id: string,
+    @Body() dto: CreateParcelLocationInsightDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcelsService.addLocationInsight(id, dto, user);
   }
 }

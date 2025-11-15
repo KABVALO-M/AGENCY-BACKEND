@@ -18,13 +18,59 @@ import * as path from 'path';
 import * as turf from '@turf/turf';
 import { UpdateParcelDto } from '../dtos/request/update-parcel.dto';
 import { parseGeometryFile } from '../utils/geometry-file.util';
+import { ParcelPopulationStat } from '../entities/parcel-population-stat.entity';
+import { ParcelFacility } from '../entities/parcel-facility.entity';
+import { ParcelClimateMetric } from '../entities/parcel-climate-metric.entity';
+import { ParcelRiskInput } from '../entities/parcel-risk-input.entity';
+import { ParcelRiskAssessment } from '../entities/parcel-risk-assessment.entity';
+import { ParcelLocationInsight } from '../entities/parcel-location-insight.entity';
+import { MaterializedViewRefresh } from '../entities/materialized-view-refresh.entity';
+import { CreateParcelPopulationStatDto } from '../dtos/request/create-parcel-population-stat.dto';
+import { CreateParcelFacilityDto } from '../dtos/request/create-parcel-facility.dto';
+import { CreateParcelClimateMetricDto } from '../dtos/request/create-parcel-climate-metric.dto';
+import { UpsertParcelRiskInputDto } from '../dtos/request/upsert-parcel-risk-input.dto';
+import { CreateParcelRiskAssessmentDto } from '../dtos/request/create-parcel-risk-assessment.dto';
+import { CreateParcelLocationInsightDto } from '../dtos/request/create-parcel-location-insight.dto';
+import { RefreshMaterializedViewDto } from '../dtos/request/refresh-materialized-view.dto';
+import { ParcelSchemaService } from './parcel-schema.service';
+import {
+  PARCEL_MATERIALIZED_VIEWS,
+  ParcelMaterializedView,
+} from '../constants/materialized-view.constant';
   
   @Injectable()
   export class ParcelsService {
     constructor(
       @InjectRepository(Parcel)
       private readonly parcelRepository: Repository<Parcel>,
+      @InjectRepository(ParcelPopulationStat)
+      private readonly populationRepository: Repository<ParcelPopulationStat>,
+      @InjectRepository(ParcelFacility)
+      private readonly facilityRepository: Repository<ParcelFacility>,
+      @InjectRepository(ParcelClimateMetric)
+      private readonly climateRepository: Repository<ParcelClimateMetric>,
+      @InjectRepository(ParcelRiskInput)
+      private readonly riskInputRepository: Repository<ParcelRiskInput>,
+      @InjectRepository(ParcelRiskAssessment)
+      private readonly riskAssessmentRepository: Repository<ParcelRiskAssessment>,
+      @InjectRepository(ParcelLocationInsight)
+      private readonly insightRepository: Repository<ParcelLocationInsight>,
+      @InjectRepository(MaterializedViewRefresh)
+      private readonly viewRefreshRepository: Repository<MaterializedViewRefresh>,
+      private readonly parcelSchemaService: ParcelSchemaService,
     ) {}
+
+    private async getParcelOrThrow(id: string): Promise<Parcel> {
+      const parcel = await this.parcelRepository.findOne({ where: { id, deletedAt: IsNull() } });
+      if (!parcel) {
+        throw new NotFoundException(PARCEL_MESSAGES.NOT_FOUND);
+      }
+      return parcel;
+    }
+
+    private auditUser(user: AuthenticatedUser): string | undefined {
+      return user?.email ?? user?.id ?? undefined;
+    }
   
     // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
     async create(
@@ -306,6 +352,128 @@ import { parseGeometryFile } from '../utils/geometry-file.util';
         throw new InternalServerErrorException(PARCEL_MESSAGES.DELETE_FAILED);
         }
     }
-  
+
+    async addPopulationStat(
+      parcelId: string,
+      dto: CreateParcelPopulationStatDto,
+      user: AuthenticatedUser,
+    ) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      const record = this.populationRepository.create({
+        ...dto,
+        parcel,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      });
+      const saved = await this.populationRepository.save(record);
+      return { message: PARCEL_MESSAGES.POPULATION_STAT_CREATED, data: saved };
+    }
+
+    async addFacility(parcelId: string, dto: CreateParcelFacilityDto, user: AuthenticatedUser) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      const facility = this.facilityRepository.create({
+        ...dto,
+        parcel,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      });
+      const saved = await this.facilityRepository.save(facility);
+      return { message: PARCEL_MESSAGES.FACILITY_CREATED, data: saved };
+    }
+
+    async addClimateMetric(parcelId: string, dto: CreateParcelClimateMetricDto, user: AuthenticatedUser) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      const metric = this.climateRepository.create({
+        ...dto,
+        parcel,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      });
+      const saved = await this.climateRepository.save(metric);
+      return { message: PARCEL_MESSAGES.CLIMATE_METRIC_CREATED, data: saved };
+    }
+
+    async upsertRiskInput(parcelId: string, dto: UpsertParcelRiskInputDto, user: AuthenticatedUser) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      let existing = await this.riskInputRepository.findOne({
+        where: { parcel: { id: parcel.id }, metric: dto.metric },
+      });
+
+      if (!existing) {
+        existing = this.riskInputRepository.create({
+          ...dto,
+          parcel,
+          createdBy: auditUser,
+          updatedBy: auditUser,
+        });
+      } else {
+        existing.value = dto.value ?? existing.value;
+        existing.weight = dto.weight ?? existing.weight;
+        existing.normalizedScore = dto.normalizedScore ?? existing.normalizedScore;
+        existing.dataSource = dto.dataSource ?? existing.dataSource;
+        existing.metadata = dto.metadata ?? existing.metadata;
+        existing.lastEvaluatedAt = dto.lastEvaluatedAt ?? existing.lastEvaluatedAt;
+        existing.updatedBy = auditUser ?? existing.updatedBy;
+      }
+
+      const saved = await this.riskInputRepository.save(existing);
+      return { message: PARCEL_MESSAGES.RISK_INPUT_RECORDED, data: saved };
+    }
+
+    async addRiskAssessment(
+      parcelId: string,
+      dto: CreateParcelRiskAssessmentDto,
+      user: AuthenticatedUser,
+    ) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      const assessment = this.riskAssessmentRepository.create({
+        ...dto,
+        methodologyVersion: dto.methodologyVersion ?? 'v1',
+        parcel,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      });
+      const saved = await this.riskAssessmentRepository.save(assessment);
+      return { message: PARCEL_MESSAGES.RISK_ASSESSMENT_CREATED, data: saved };
+    }
+
+    async addLocationInsight(
+      parcelId: string,
+      dto: CreateParcelLocationInsightDto,
+      user: AuthenticatedUser,
+    ) {
+      const parcel = await this.getParcelOrThrow(parcelId);
+      const auditUser = this.auditUser(user);
+      const insight = this.insightRepository.create({
+        ...dto,
+        parcel,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      });
+      const saved = await this.insightRepository.save(insight);
+      return { message: PARCEL_MESSAGES.LOCATION_INSIGHT_CREATED, data: saved };
+    }
+
+    async refreshMaterializedViews(dto: RefreshMaterializedViewDto) {
+      const targets: ParcelMaterializedView[] = dto.viewName
+        ? [dto.viewName]
+        : [...PARCEL_MATERIALIZED_VIEWS];
+      for (const viewName of targets) {
+        await this.parcelSchemaService.refreshMaterializedView(viewName);
+      }
+      return { message: PARCEL_MESSAGES.MATERIALIZED_VIEW_REFRESHED, views: targets };
+    }
+
+    async getMaterializedViewStatuses() {
+      const statuses = await this.viewRefreshRepository.find({
+        order: { viewName: 'ASC' },
+      });
+      return { message: PARCEL_MESSAGES.MATERIALIZED_VIEW_STATUS_FETCHED, data: statuses };
+    }
   }
   

@@ -29,6 +29,7 @@ export class Parcel {
   // ─────────────── GEOMETRY ───────────────
   @Column({
     type: 'geometry',
+    spatialFeatureType: 'Polygon',
     srid: 4326,
   })
   geometry: Geometry;

@@ -11,5 +11,5 @@ export const getOrmConfig = (
   password: config.get<string>('DB_PASS', 'Terracore@2025'),
   database: config.get<string>('DB_NAME', 'terracore'),
   autoLoadEntities: true,
-  synchronize: true,
+  synchronize: false,
 });

@@ -34,6 +34,16 @@ export const PARCEL_MESSAGES = {
     // ─────────────── FILTER / FETCH ───────────────
     FETCH_FAILED: 'Failed to fetch parcels.',
     NO_PARCELS_FOUND: 'No parcels available for the given criteria.',
+
+    // ─────────────── ANALYTICS / METRICS ───────────────
+    POPULATION_STAT_CREATED: 'Population statistic recorded successfully.',
+    FACILITY_CREATED: 'Facility information recorded successfully.',
+    CLIMATE_METRIC_CREATED: 'Climate metric recorded successfully.',
+    RISK_INPUT_RECORDED: 'Risk input stored successfully.',
+    RISK_ASSESSMENT_CREATED: 'Risk assessment saved successfully.',
+    LOCATION_INSIGHT_CREATED: 'Location insight recorded successfully.',
+    MATERIALIZED_VIEW_REFRESHED: 'Materialized view refresh triggered.',
+    MATERIALIZED_VIEW_STATUS_FETCHED: 'Materialized view statuses retrieved.',
   } as const;
   
   export type ParcelMessageKey = keyof typeof PARCEL_MESSAGES;
