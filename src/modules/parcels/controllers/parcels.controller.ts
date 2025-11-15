@@ -236,6 +236,35 @@ export class ParcelsController {
     return this.geoServerSyncService.syncAll();
   }
 
+  // ──────────────────────────────── RISK SUMMARY ────────────────────────────────
+  @Get(':id/risk-summary')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get latest risk summary for a parcel',
+  })
+  async getParcelRiskSummary(@Param('id') id: string) {
+    return this.parcelsService.getParcelRiskSummary(id);
+  }
+
+  // ──────────────────────────────── TOP RISK PARCELS ────────────────────────────────
+  @Get('analytics/top-risk')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List highest-risk parcels',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Max parcels to return (default 5)',
+  })
+  async getTopRiskParcels(@Query('limit') limit?: number) {
+    const parsed = limit && Number(limit) > 0 ? Number(limit) : undefined;
+    return this.parcelsService.getTopRiskParcels(parsed);
+  }
+
   // ──────────────────────────────── GET ONE PARCEL ────────────────────────────────
   @Get(':id')
   @UseGuards(JwtAuthGuard)

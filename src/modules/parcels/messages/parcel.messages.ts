@@ -46,6 +46,8 @@ export const PARCEL_MESSAGES = {
     MATERIALIZED_VIEW_STATUS_FETCHED: 'Materialized view statuses retrieved.',
     GEOSERVER_SYNC_TRIGGERED:
       'GeoServer synchronization triggered. Layers will be available shortly.',
+    RISK_SUMMARY_FETCHED: 'Latest risk summary retrieved.',
+    TOP_RISK_LIST_FETCHED: 'Top risk parcels retrieved.',
   } as const;
 
   export type ParcelMessageKey = keyof typeof PARCEL_MESSAGES;

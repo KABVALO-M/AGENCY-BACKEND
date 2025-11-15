@@ -38,6 +38,7 @@ import {
   ParcelMaterializedView,
 } from '../constants/materialized-view.constant';
 import { ParcelIngestionService } from './parcel-ingestion.service';
+import { ParcelRiskSummaryView } from '../entities/parcel-risk-summary-view.entity';
   
   @Injectable()
   export class ParcelsService {
@@ -58,6 +59,8 @@ import { ParcelIngestionService } from './parcel-ingestion.service';
       private readonly insightRepository: Repository<ParcelLocationInsight>,
       @InjectRepository(MaterializedViewRefresh)
       private readonly viewRefreshRepository: Repository<MaterializedViewRefresh>,
+      @InjectRepository(ParcelRiskSummaryView)
+      private readonly riskSummaryRepository: Repository<ParcelRiskSummaryView>,
       private readonly parcelSchemaService: ParcelSchemaService,
       private readonly parcelIngestionService: ParcelIngestionService,
     ) {}
@@ -205,7 +208,7 @@ import { ParcelIngestionService } from './parcel-ingestion.service';
     // ──────────────────────────────── FIND ONE PARCEL ────────────────────────────────
     async findOne(id: string, asGeoJson = false): Promise<any> {
         // Find parcel with related entities
-        const parcel = await this.parcelRepository.findOne({
+      const parcel = await this.parcelRepository.findOne({
         where: { id, deletedAt: IsNull() },
         relations: ['createdBy', 'owner'],
         });
@@ -490,6 +493,38 @@ import { ParcelIngestionService } from './parcel-ingestion.service';
         order: { viewName: 'ASC' },
       });
       return { message: PARCEL_MESSAGES.MATERIALIZED_VIEW_STATUS_FETCHED, data: statuses };
+    }
+
+    async getParcelRiskSummary(parcelId: string) {
+      await this.getParcelOrThrow(parcelId);
+      const summary = await this.riskSummaryRepository.findOne({
+        where: { parcelId },
+      });
+      return {
+        message: PARCEL_MESSAGES.RISK_SUMMARY_FETCHED,
+        data: summary,
+      };
+    }
+
+    async getTopRiskParcels(limit = 5) {
+      const rows = await this.riskSummaryRepository
+        .createQueryBuilder('summary')
+        .innerJoin(Parcel, 'parcel', 'parcel.id = summary.parcel_id')
+        .select([
+          'summary.parcel_id AS "parcelId"',
+          'parcel.name AS "name"',
+          'summary."overallScore" AS "overallScore"',
+          'summary."riskBand" AS "riskBand"',
+          'parcel.geometry IS NOT NULL AS "hasGeometry"',
+        ])
+        .orderBy('summary."overallScore"', 'DESC')
+        .limit(limit)
+        .getRawMany();
+
+      return {
+        message: PARCEL_MESSAGES.TOP_RISK_LIST_FETCHED,
+        data: rows,
+      };
     }
   }
   
