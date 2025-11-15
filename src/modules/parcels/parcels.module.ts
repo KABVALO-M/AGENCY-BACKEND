@@ -13,6 +13,7 @@ import { MaterializedViewRefresh } from './entities/materialized-view-refresh.en
 import { ParcelSchemaService } from './services/parcel-schema.service';
 import { ParcelIngestionService } from './services/parcel-ingestion.service';
 import { EnvironmentalDataService } from './services/environmental-data.service';
+import { GeoServerSyncService } from './services/geoserver-sync.service';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { EnvironmentalDataService } from './services/environmental-data.service'
     ParcelSchemaService,
     ParcelIngestionService,
     EnvironmentalDataService,
+    GeoServerSyncService,
   ],
   exports: [ParcelsService],
 })

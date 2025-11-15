@@ -44,7 +44,9 @@ export const PARCEL_MESSAGES = {
     LOCATION_INSIGHT_CREATED: 'Location insight recorded successfully.',
     MATERIALIZED_VIEW_REFRESHED: 'Materialized view refresh triggered.',
     MATERIALIZED_VIEW_STATUS_FETCHED: 'Materialized view statuses retrieved.',
+    GEOSERVER_SYNC_TRIGGERED:
+      'GeoServer synchronization triggered. Layers will be available shortly.',
   } as const;
-  
+
   export type ParcelMessageKey = keyof typeof PARCEL_MESSAGES;
   

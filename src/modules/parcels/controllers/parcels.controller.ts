@@ -43,6 +43,10 @@ import { UpsertParcelRiskInputDto } from '../dtos/request/upsert-parcel-risk-inp
 import { CreateParcelRiskAssessmentDto } from '../dtos/request/create-parcel-risk-assessment.dto';
 import { CreateParcelLocationInsightDto } from '../dtos/request/create-parcel-location-insight.dto';
 import { RefreshMaterializedViewDto } from '../dtos/request/refresh-materialized-view.dto';
+import {
+  GeoServerSyncService,
+  GeoServerSyncResult,
+} from '../services/geoserver-sync.service';
 
 @ApiTags('Parcels')
 @ApiBearerAuth()
@@ -50,7 +54,10 @@ import { RefreshMaterializedViewDto } from '../dtos/request/refresh-materialized
 export class ParcelsController {
   private readonly logger = new Logger(ParcelsController.name);
 
-  constructor(private readonly parcelsService: ParcelsService) {}
+  constructor(
+    private readonly parcelsService: ParcelsService,
+    private readonly geoServerSyncService: GeoServerSyncService,
+  ) {}
 
   // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
   @Post()
@@ -211,6 +218,22 @@ export class ParcelsController {
   })
   async refreshMaterializedViews(@Body() dto: RefreshMaterializedViewDto) {
     return this.parcelsService.refreshMaterializedViews(dto);
+  }
+
+  // ──────────────────────────────── GEOSERVER SYNC ────────────────────────────────
+  @Post('geoserver/sync')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Synchronize GeoServer workspace, datastore, and layers',
+    description:
+      'Ensures the configured workspace/datastore exist and publishes parcels analytics tables as layers.',
+  })
+  async syncGeoServer(): Promise<{
+    message: string;
+    data: GeoServerSyncResult;
+  }> {
+    return this.geoServerSyncService.syncAll();
   }
 
   // ──────────────────────────────── GET ONE PARCEL ────────────────────────────────
