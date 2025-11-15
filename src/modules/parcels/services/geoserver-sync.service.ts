@@ -43,13 +43,50 @@ export class GeoServerSyncService {
       this.configService.get<string>('GEOSERVER_DATASTORE') ??
       'terracore_store';
 
+    const defaultDbHost = this.configService.get<string>('DB_HOST', 'localhost');
+    const defaultDbPort = this.configService.get<string>('DB_PORT', '55432');
+    const defaultDbUser = this.configService.get<string>(
+      'DB_USER',
+      'terracore_user',
+    );
+    const defaultDbPass = this.configService.get<string>(
+      'DB_PASS',
+      'Terracore@2025',
+    );
+    const defaultDbName = this.configService.get<string>(
+      'DB_NAME',
+      'terracore',
+    );
+    const defaultDbSchema = this.configService.get<string>(
+      'DB_SCHEMA',
+      'public',
+    );
+
     this.dbConfig = {
-      host: this.configService.get<string>('DB_HOST', 'localhost'),
-      port: this.configService.get<string>('DB_PORT', '55432'),
-      database: this.configService.get<string>('DB_NAME', 'terracore'),
-      schema: this.configService.get<string>('DB_SCHEMA', 'public'),
-      user: this.configService.get<string>('DB_USER', 'terracore_user'),
-      password: this.configService.get<string>('DB_PASS', 'Terracore@2025'),
+      host: this.configService.get<string>(
+        'GEOSERVER_DB_HOST',
+        defaultDbHost,
+      ),
+      port: this.configService.get<string>(
+        'GEOSERVER_DB_PORT',
+        defaultDbPort,
+      ),
+      database: this.configService.get<string>(
+        'GEOSERVER_DB_NAME',
+        defaultDbName,
+      ),
+      schema: this.configService.get<string>(
+        'GEOSERVER_DB_SCHEMA',
+        defaultDbSchema,
+      ),
+      user: this.configService.get<string>(
+        'GEOSERVER_DB_USER',
+        defaultDbUser,
+      ),
+      password: this.configService.get<string>(
+        'GEOSERVER_DB_PASS',
+        defaultDbPass,
+      ),
     };
   }
 
