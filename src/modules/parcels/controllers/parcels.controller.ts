@@ -47,6 +47,9 @@ import {
   GeoServerSyncService,
   GeoServerSyncResult,
 } from '../services/geoserver-sync.service';
+import { ParcelReportService } from '../services/parcel-report.service';
+import type { Response } from 'express';
+import { Res } from '@nestjs/common';
 
 @ApiTags('Parcels')
 @ApiBearerAuth()
@@ -57,6 +60,7 @@ export class ParcelsController {
   constructor(
     private readonly parcelsService: ParcelsService,
     private readonly geoServerSyncService: GeoServerSyncService,
+    private readonly parcelReportService: ParcelReportService,
   ) {}
 
   // ──────────────────────────────── CREATE PARCEL ────────────────────────────────
@@ -497,5 +501,22 @@ export class ParcelsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.parcelsService.addLocationInsight(id, dto, user);
+  }
+
+  // ──────────────────────────────── REPORT DOWNLOAD ────────────────────────────────
+  @Get(':id/report')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Generate parcel PDF report',
+  })
+  async downloadReport(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.parcelReportService.generateParcelReport(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="parcel-${id}.pdf"`,
+    );
+    res.send(buffer);
   }
 }

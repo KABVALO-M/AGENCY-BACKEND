@@ -15,6 +15,7 @@ import { ParcelIngestionService } from './services/parcel-ingestion.service';
 import { EnvironmentalDataService } from './services/environmental-data.service';
 import { GeoServerSyncService } from './services/geoserver-sync.service';
 import { ParcelRiskSummaryView } from './entities/parcel-risk-summary-view.entity';
+import { ParcelReportService } from './services/parcel-report.service';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ParcelRiskSummaryView } from './entities/parcel-risk-summary-view.entit
     ParcelIngestionService,
     EnvironmentalDataService,
     GeoServerSyncService,
+    ParcelReportService,
   ],
   exports: [ParcelsService],
 })
