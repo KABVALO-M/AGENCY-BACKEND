@@ -254,6 +254,17 @@ export class GeoServerSyncService {
     );
   }
 
+  private buildAuthHeaders(
+    extra?: Record<string, string>,
+  ): Record<string, string> {
+    return {
+      Authorization: `Basic ${Buffer.from(
+        `${this.username}:${this.password}`,
+      ).toString('base64')}`,
+      ...(extra ?? {}),
+    };
+  }
+
   private async requestRaw(
     method: string,
     path: string,
@@ -261,21 +272,103 @@ export class GeoServerSyncService {
   ): Promise<Response> {
     const base = this.baseUrl.replace(/\/$/, '');
     const url = `${base}/rest${path}`;
-    const headers: Record<string, string> = {
-      Authorization: `Basic ${Buffer.from(
-        `${this.username}:${this.password}`,
-      ).toString('base64')}`,
+    this.logger.debug(
+      `GeoServer REST request: ${method.toUpperCase()} ${url}`,
+    );
+    const headers: Record<string, string> = this.buildAuthHeaders({
       Accept: 'application/json',
-    };
+    });
 
     if (body) {
       headers['Content-Type'] = 'application/json';
     }
 
-    return fetch(url, {
+    const response = await fetch(url, {
       method,
       headers,
       body,
     });
+    this.logger.verbose?.(
+      `GeoServer REST response: ${method.toUpperCase()} ${url} -> ${response.status}`,
+    );
+    return response;
   }
-}
+
+  async fetchLegendGraphic(params: {
+    layer: string;
+    style?: string;
+    width?: number;
+    height?: number;
+    format?: string;
+  }): Promise<{ buffer: Buffer; contentType?: string }> {
+    const { layer, style, width, height, format } = params;
+    const base = this.baseUrl.replace(/\/$/, '');
+    const url = new URL(`${base}/${this.workspace}/ows`);
+    url.searchParams.set('service', 'WMS');
+    url.searchParams.set('version', '1.3.0');
+    url.searchParams.set('request', 'GetLegendGraphic');
+    url.searchParams.set('layer', layer.includes(':') ? layer : `${this.workspace}:${layer}`);
+    url.searchParams.set('format', format ?? 'image/png');
+    url.searchParams.set('width', String(width ?? 20));
+    url.searchParams.set('height', String(height ?? 20));
+    if (style) {
+      url.searchParams.set('style', style);
+    }
+
+    const requestUrl = url.toString();
+    this.logger.log(
+      `Fetching legend from GeoServer: ${requestUrl}`,
+    );
+    const response = await fetch(requestUrl, {
+      headers: this.buildAuthHeaders({
+        Accept: 'image/png, image/*;q=0.8, */*;q=0.5',
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(
+        `Legend request failed (${response.status}): ${text}`,
+      );
+      throw new Error(
+        `Legend request failed: ${response.status} ${text}`,
+      );
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      contentType: response.headers.get('content-type') ?? undefined,
+    };
+  }
+
+  async proxyWmsRequest(query: Record<string, any>): Promise<{
+    buffer: Buffer;
+    contentType?: string;
+  }> {
+    const base = this.baseUrl.replace(/\/$/, '');
+    const url = new URL(`${base}/${this.workspace}/wms`);
+    const searchParams = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((v) => searchParams.append(key, String(v)));
+      } else if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    });
+    url.search = searchParams.toString();
+
+    const requestUrl = url.toString();
+    this.logger.debug(
+      `Proxying WMS request to GeoServer: ${requestUrl}`,
+    );
+    const response = await fetch(requestUrl, {
+      headers: this.buildAuthHeaders({
+        Accept: 'image/png, image/*;q=0.8, */*;q=0.5',
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(
+        `WMS proxy request failed (${response.status}): ${text}`,
+      );
+      throw new Error(
+        `WMS prox

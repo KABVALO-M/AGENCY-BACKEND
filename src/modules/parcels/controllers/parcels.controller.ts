@@ -15,6 +15,9 @@ import {
   Patch,
   Delete,
   Logger,
+  BadRequestException,
+  Res,
+  Req,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -48,8 +51,7 @@ import {
   GeoServerSyncResult,
 } from '../services/geoserver-sync.service';
 import { ParcelReportService } from '../services/parcel-report.service';
-import type { Response } from 'express';
-import { Res } from '@nestjs/common';
+import type { Response, Request } from 'express';
 
 @ApiTags('Parcels')
 @ApiBearerAuth()
@@ -238,6 +240,50 @@ export class ParcelsController {
     data: GeoServerSyncResult;
   }> {
     return this.geoServerSyncService.syncAll();
+  }
+
+  @Get('geoserver/legend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Proxy GeoServer legend graphic',
+    description:
+      'Fetches the WMS legend graphic through the backend so browsers avoid cross-origin restrictions.',
+  })
+  async getLegendGraphic(
+    @Query('layer') layer: string,
+    @Res() res: Response,
+    @Query('style') style?: string,
+    @Query('width') width?: number,
+    @Query('height') height?: number,
+  ) {
+    if (!layer) {
+      throw new BadRequestException('Layer query parameter is required.');
+    }
+    const parsedWidth = width ? Number(width) : undefined;
+    const parsedHeight = height ? Number(height) : undefined;
+    const result = await this.geoServerSyncService.fetchLegendGraphic({
+      layer,
+      style,
+      width: parsedWidth,
+      height: parsedHeight,
+    });
+    res.setHeader('Content-Type', result.contentType ?? 'image/png');
+    res.send(result.buffer);
+  }
+
+  @Get('geoserver/wms-proxy')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Proxy GeoServer WMS requests',
+    description: 'Fetches WMS tiles via the backend to avoid browser cross-origin issues.',
+  })
+  async proxyWms(
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const result = await this.geoServerSyncService.proxyWmsRequest(req.query);
+    res.setHeader('Content-Type', result.contentType ?? 'image/png');
+    res.send(result.buffer);
   }
 
   // ──────────────────────────────── RISK SUMMARY ────────────────────────────────
