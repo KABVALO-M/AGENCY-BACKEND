@@ -265,11 +265,38 @@ export class GeoServerSyncService {
     };
   }
 
+  private async logResponseDetails(
+    response: globalThis.Response,
+    context: string,
+  ): Promise<void> {
+    const loggerMethod = response.ok
+      ? this.logger.debug.bind(this.logger)
+      : this.logger.warn.bind(this.logger);
+    const contentType = response.headers.get('content-type') ?? 'unknown';
+    let bodyPreview = '<binary content omitted>';
+    if (
+      contentType.includes('application/json') ||
+      contentType.includes('text/')
+    ) {
+      try {
+        const text = await response.clone().text();
+        bodyPreview = text.slice(0, 500);
+      } catch (error) {
+        bodyPreview = `<failed to read body: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }>`;
+      }
+    }
+    loggerMethod(
+      `${context} -> ${response.status} (${contentType}) body: ${bodyPreview}`,
+    );
+  }
+
   private async requestRaw(
     method: string,
     path: string,
     body?: string,
-  ): Promise<Response> {
+  ): Promise<globalThis.Response> {
     const base = this.baseUrl.replace(/\/$/, '');
     const url = `${base}/rest${path}`;
     this.logger.debug(
@@ -288,8 +315,9 @@ export class GeoServerSyncService {
       headers,
       body,
     });
-    this.logger.verbose?.(
-      `GeoServer REST response: ${method.toUpperCase()} ${url} -> ${response.status}`,
+    await this.logResponseDetails(
+      response,
+      `GeoServer REST response ${method.toUpperCase()} ${url}`,
     );
     return response;
   }
@@ -334,6 +362,9 @@ export class GeoServerSyncService {
       );
     }
     const arrayBuffer = await response.arrayBuffer();
+    this.logger.debug(
+      `Legend request succeeded (${response.status}) ${requestUrl} -> ${arrayBuffer.byteLength} bytes`,
+    );
     return {
       buffer: Buffer.from(arrayBuffer),
       contentType: response.headers.get('content-type') ?? undefined,
@@ -371,4 +402,16 @@ export class GeoServerSyncService {
         `WMS proxy request failed (${response.status}): ${text}`,
       );
       throw new Error(
-        `WMS prox
+        `WMS proxy request failed: ${response.status} ${text}`,
+      );
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    this.logger.debug(
+      `WMS proxy request succeeded (${response.status}) ${requestUrl} -> ${arrayBuffer.byteLength} bytes`,
+    );
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      contentType: response.headers.get('content-type') ?? undefined,
+    };
+  }
+}

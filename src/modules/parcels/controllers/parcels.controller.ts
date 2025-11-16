@@ -242,6 +242,18 @@ export class ParcelsController {
     return this.geoServerSyncService.syncAll();
   }
 
+  private setProxyCorsHeaders(res: Response, originHeader?: string | string[]) {
+    if (originHeader && typeof originHeader === 'string') {
+      res.setHeader('Access-Control-Allow-Origin', originHeader);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept',
+    );
+  }
+
   @Get('geoserver/legend')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -252,6 +264,7 @@ export class ParcelsController {
   async getLegendGraphic(
     @Query('layer') layer: string,
     @Res() res: Response,
+    @Req() req: Request,
     @Query('style') style?: string,
     @Query('width') width?: number,
     @Query('height') height?: number,
@@ -267,6 +280,7 @@ export class ParcelsController {
       width: parsedWidth,
       height: parsedHeight,
     });
+    this.setProxyCorsHeaders(res, req.headers.origin);
     res.setHeader('Content-Type', result.contentType ?? 'image/png');
     res.send(result.buffer);
   }
@@ -282,6 +296,7 @@ export class ParcelsController {
     @Res() res: Response,
   ) {
     const result = await this.geoServerSyncService.proxyWmsRequest(req.query);
+    this.setProxyCorsHeaders(res, req.headers.origin);
     res.setHeader('Content-Type', result.contentType ?? 'image/png');
     res.send(result.buffer);
   }
