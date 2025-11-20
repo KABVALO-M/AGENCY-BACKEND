@@ -83,6 +83,34 @@ Check out a few resources that may come in handy when working with NestJS:
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
+## GeoServer integration
+
+To let the frontend call GeoServer directly (bypassing the Nest proxy), expose the host in `.env`:
+
+```
+GEOSERVER_PUBLIC_URL=http://localhost:8080/geoserver
+```
+
+Leaflet (or any other WMS client) should point to the workspace endpoints derived from that value:
+
+```ts
+const geoserverUrl = import.meta.env.VITE_GEOSERVER_PUBLIC_URL ?? 'http://localhost:8080/geoserver';
+
+const parcelsLayer = L.tileLayer.wms(`${geoserverUrl}/terracore/wms`, {
+  layers: 'terracore:parcels',
+  styles: 'generic',
+  format: 'image/png',
+  transparent: true,
+  version: '1.3.0',
+});
+
+const legendUrl = `${geoserverUrl}/terracore/ows?service=WMS&version=1.3.0&request=GetLegendGraphic&layer=terracore:parcels&style=generic&format=image/png`;
+```
+
+Update the frontend build configuration so `VITE_GEOSERVER_PUBLIC_URL` (or `REACT_APP_...`) is injected, and the overlays will render using GeoServer’s own CORS settings.
+
+The backend ships with a reusable `generic` SLD at `resources/geoserver/styles/generic.sld`. During `POST /api/v1/parcels/geoserver/sync`, the service uploads that SLD (respecting `GEOSERVER_STYLE_NAME`) and assigns it as the default style for each published layer, so the frontend can simply pass `styles=generic`.
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).

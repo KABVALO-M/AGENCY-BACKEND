@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   GEOSERVER_LAYER_CONFIGS,
   GeoServerLayerConfig,
@@ -20,6 +22,8 @@ export class GeoServerSyncService {
   private readonly password: string;
   private readonly workspace: string;
   private readonly dataStore: string;
+  private readonly defaultStyleName: string;
+  private readonly defaultStylePath: string;
   private readonly dbConfig: {
     host: string;
     port: string;
@@ -42,6 +46,17 @@ export class GeoServerSyncService {
     this.dataStore =
       this.configService.get<string>('GEOSERVER_DATASTORE') ??
       'terracore_store';
+    this.defaultStyleName =
+      this.configService.get<string>('GEOSERVER_STYLE_NAME') ?? 'generic';
+    this.defaultStylePath =
+      this.configService.get<string>('GEOSERVER_STYLE_PATH') ??
+      join(
+        process.cwd(),
+        'resources',
+        'geoserver',
+        'styles',
+        `${this.defaultStyleName}.sld`,
+      );
 
     const defaultDbHost = this.configService.get<string>('DB_HOST', 'localhost');
     const defaultDbPort = this.configService.get<string>('DB_PORT', '55432');
@@ -93,10 +108,12 @@ export class GeoServerSyncService {
   async syncAll(): Promise<{ message: string; data: GeoServerSyncResult }> {
     await this.ensureWorkspace();
     await this.ensureDataStore();
+    await this.ensureDefaultStyle();
 
     const publishedLayers: string[] = [];
     for (const layer of GEOSERVER_LAYER_CONFIGS) {
       const published = await this.publishLayer(layer);
+      await this.assignStyleToLayer(layer.name);
       if (published) {
         publishedLayers.push(layer.name);
       }
@@ -217,6 +234,114 @@ export class GeoServerSyncService {
       payload,
     );
     return true;
+  }
+
+  private async ensureDefaultStyle(): Promise<void> {
+    let sldContent: string;
+    try {
+      sldContent = readFileSync(this.defaultStylePath, 'utf8');
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Failed to read GeoServer style file at ${this.defaultStylePath}: ${err.message}`,
+      );
+      throw err;
+    }
+
+    const stylePath = `/workspaces/${this.workspace}/styles/${this.defaultStyleName}.json`;
+    const exists = await this.exists(stylePath).catch((error) => {
+      this.logger.error(`Style check failed: ${(error as Error).message}`);
+      throw error;
+    });
+
+    await this.uploadStyle(this.defaultStyleName, sldContent, exists);
+  }
+
+  private async uploadStyle(
+    name: string,
+    sldContent: string,
+    replaceExisting: boolean,
+  ): Promise<void> {
+    const base = this.baseUrl.replace(/\/$/, '');
+    const path = replaceExisting
+      ? `/workspaces/${this.workspace}/styles/${name}`
+      : `/workspaces/${this.workspace}/styles?name=${name}`;
+    const method = replaceExisting ? 'PUT' : 'POST';
+    const response = await fetch(`${base}/rest${path}`, {
+      method,
+      headers: this.buildAuthHeaders({
+        'Content-Type': 'application/vnd.ogc.sld+xml',
+        Accept: 'application/json',
+      }),
+      body: sldContent,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Failed to ${replaceExisting ? 'update' : 'create'} style ${name}: ${
+          response.status
+        } ${text}`,
+      );
+    }
+    this.logger.log(
+      `GeoServer style ${name} ${replaceExisting ? 'updated' : 'created'} (${
+        response.status
+      })`,
+    );
+  }
+
+  private async assignStyleToLayer(layerName: string): Promise<void> {
+    const layerPath = `/layers/${this.workspace}:${layerName}.json`;
+    const response = await this.requestRaw('GET', layerPath);
+
+    if (response.status === 404) {
+      this.logger.warn(
+        `Layer ${layerName} not found when assigning style ${this.defaultStyleName}`,
+      );
+      return;
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Failed to fetch layer ${layerName} for styling: ${response.status} ${text}`,
+      );
+    }
+
+    const currentConfig = await response.json();
+    const currentStyles =
+      currentConfig?.layer?.styles?.style && Array.isArray(currentConfig.layer.styles.style)
+        ? currentConfig.layer.styles.style
+        : currentConfig?.layer?.styles?.style
+          ? [currentConfig.layer.styles.style]
+          : [];
+    const hasDefault =
+      currentConfig?.layer?.defaultStyle?.name === this.defaultStyleName;
+    const alreadyListed = currentStyles.some(
+      (style: { name?: string }) => style?.name === this.defaultStyleName,
+    );
+
+    if (hasDefault && alreadyListed) {
+      return;
+    }
+
+    const payload = {
+      layer: {
+        ...currentConfig.layer,
+        defaultStyle: { name: this.defaultStyleName },
+        styles: {
+          style: alreadyListed
+            ? currentStyles
+            : [...currentStyles, { name: this.defaultStyleName }],
+        },
+      },
+    };
+
+    await this.request(
+      'PUT',
+      `/layers/${this.workspace}:${layerName}`,
+      payload,
+    );
   }
 
   private async exists(path: string): Promise<boolean> {
