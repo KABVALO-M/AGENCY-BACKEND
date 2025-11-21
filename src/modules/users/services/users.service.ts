@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,7 @@ import { Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/request/create-user.dto';
+import { UpdateUserDto } from '../dtos/request/update-user.dto';
 import { RolesService } from '../../roles/services/roles.service';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { AppLoggerService } from '../../../common/logger/app-logger.service';
@@ -92,5 +94,66 @@ export class UsersService {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     return user;
+  }
+
+  async updateUser(
+    id: string,
+    dto: UpdateUserDto,
+    updatedBy: AuthenticatedUser,
+  ): Promise<User> {
+    const user = await this.findById(id);
+    const normalizedEmail = dto.email.trim();
+
+    const emailInUse = await this.userRepo
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = LOWER(:email)', { email: normalizedEmail })
+      .andWhere('user.id != :id', { id })
+      .getCount();
+
+    if (emailInUse > 0) {
+      throw new ConflictException('A user with this email already exists');
+    }
+
+    const role = await this.rolesService.findById(dto.roleId);
+    const trimmedPhone = dto.phone?.trim();
+    const sanitizedPhone =
+      trimmedPhone && trimmedPhone.length > 0 ? trimmedPhone : undefined;
+
+    let emailVerifiedAt = user.emailVerifiedAt ?? null;
+    if (dto.emailVerified && !user.emailVerified) {
+      emailVerifiedAt = new Date();
+    } else if (!dto.emailVerified) {
+      emailVerifiedAt = null;
+    }
+
+    user.firstName = dto.firstName.trim();
+    user.lastName = dto.lastName.trim();
+    user.email = normalizedEmail;
+    user.phone = sanitizedPhone;
+    user.role = role;
+    user.isActive = dto.isActive;
+    user.emailVerified = dto.emailVerified;
+    user.emailVerifiedAt = emailVerifiedAt ?? undefined;
+
+    const saved = await this.userRepo.save(user);
+    this.logger.event(
+      `User ${saved.email} updated by admin ${updatedBy.email}`,
+      UsersService.name,
+    );
+    return saved;
+  }
+
+  async deleteUser(
+    id: string,
+    deletedBy: AuthenticatedUser,
+  ): Promise<{ message: string }> {
+    if (id === deletedBy.id) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    const user = await this.findById(id);
+    await this.userRepo.remove(user);
+    this.logger.warn(`User ${user.email} deleted by ${deletedBy.email}`);
+    return { message: `User ${user.email} deleted successfully` };
   }
 }
