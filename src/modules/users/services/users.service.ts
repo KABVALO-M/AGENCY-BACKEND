@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/request/create-user.dto';
 import { UpdateUserDto } from '../dtos/request/update-user.dto';
+import { UpdateProfileDto } from '../dtos/request/update-profile.dto';
 import { RolesService } from '../../roles/services/roles.service';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
 import { AppLoggerService } from '../../../common/logger/app-logger.service';
@@ -155,5 +156,23 @@ export class UsersService {
     await this.userRepo.remove(user);
     this.logger.warn(`User ${user.email} deleted by ${deletedBy.email}`);
     return { message: `User ${user.email} deleted successfully` };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<User> {
+    const user = await this.findById(userId);
+    const trimmedPhone = dto.phone?.trim();
+    const sanitizedPhone =
+      trimmedPhone && trimmedPhone.length > 0 ? trimmedPhone : undefined;
+
+    user.firstName = dto.firstName.trim();
+    user.lastName = dto.lastName.trim();
+    user.phone = sanitizedPhone;
+
+    const saved = await this.userRepo.save(user);
+    this.logger.event(`User ${saved.email} updated their profile`);
+    return saved;
   }
 }

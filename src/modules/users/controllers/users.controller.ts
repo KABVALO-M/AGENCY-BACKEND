@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,6 +21,7 @@ import {
 import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/request/create-user.dto';
 import { UpdateUserDto } from '../dtos/request/update-user.dto';
+import { UpdateProfileDto } from '../dtos/request/update-profile.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
@@ -81,6 +83,21 @@ export class UsersController {
     @CurrentUser('id') userId: string,
   ): Promise<UserResponseDto> {
     const user = await this.usersService.findById(userId);
+    return UserResponseDto.fromEntity(user);
+  }
+
+  @Put('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description: 'Allows the authenticated user to update their profile details.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  async updateMe(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.usersService.updateProfile(userId, dto);
     return UserResponseDto.fromEntity(user);
   }
 
