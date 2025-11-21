@@ -2,12 +2,14 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -43,5 +45,23 @@ export class UsersController {
 
     const user = await this.usersService.createUserAsAdmin(dto, currentUser);
     return UserResponseDto.fromEntity(user);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Admin: list all users (excluding requester)',
+    description: 'Returns every user profile except the authenticated admin.',
+  })
+  @ApiOkResponse({ type: [UserResponseDto] })
+  async findAll(
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ): Promise<UserResponseDto[]> {
+    if (currentUser.role.name !== RoleName.Admin) {
+      throw new ForbiddenException('Only administrators can view all users');
+    }
+
+    const users = await this.usersService.findAllExcept(currentUser.id);
+    return users.map((user) => UserResponseDto.fromEntity(user));
   }
 }

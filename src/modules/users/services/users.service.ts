@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/request/create-user.dto';
@@ -75,5 +75,12 @@ export class UsersService {
     });
 
     return saved;
+  }
+
+  async findAllExcept(userId: string): Promise<User[]> {
+    return this.userRepo.find({
+      where: { id: Not(userId) },
+      order: { createdAt: 'DESC' },
+    });
   }
 }
