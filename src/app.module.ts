@@ -11,6 +11,7 @@ import { AppService } from './app.service';
 import { getOrmConfig } from './config/ormconfig';
 import { CommonModule } from './common/common.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmailWorkerModule } from './email-worker/email-worker.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -36,6 +37,7 @@ import { ParcelsModule } from './modules/parcels/parcels.module';
 
     // 🔐 Core modules
     RolesModule,
+    UsersModule,
     AuthModule,
 
     // 🗺️ GIS Parcels Module

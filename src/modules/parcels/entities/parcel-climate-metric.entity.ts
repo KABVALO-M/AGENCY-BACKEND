@@ -75,4 +75,3 @@ export class ParcelClimateMetric {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

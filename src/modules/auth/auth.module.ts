@@ -17,7 +17,11 @@ import { EmailQueueService } from '../../common/rabbitmq/email-queue.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, EmailVerificationToken, PasswordResetToken]),
+    TypeOrmModule.forFeature([
+      User,
+      EmailVerificationToken,
+      PasswordResetToken,
+    ]),
     RolesModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({

@@ -19,4 +19,3 @@ export const GEOSERVER_LAYER_CONFIGS: GeoServerLayerConfig[] = [
     title: 'Population Density Grid',
   },
 ];
-

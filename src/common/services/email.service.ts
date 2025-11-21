@@ -19,6 +19,13 @@ export interface PasswordResetEmailData {
   expiresAt: string;
 }
 
+export interface AdminInviteEmailData {
+  firstName: string;
+  email: string;
+  password: string;
+  invitedBy: string;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -28,7 +35,8 @@ export class EmailService {
     private readonly configService: ConfigService,
     private readonly emailQueueService: EmailQueueService,
   ) {
-    this.appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    this.appUrl =
+      this.configService.get<string>('APP_URL') || 'http://localhost:3000';
   }
 
   async sendEmailVerification(userEmail: string, data: EmailVerificationData) {
@@ -36,7 +44,9 @@ export class EmailService {
       await this.emailQueueService.queueEmailVerification(userEmail, data);
       this.logger.log(`Queued verification email for ${userEmail}`);
     } catch (error) {
-      this.logger.error(`Failed to queue verification email for ${userEmail}: ${error.message}`);
+      this.logger.error(
+        `Failed to queue verification email for ${userEmail}: ${error.message}`,
+      );
     }
   }
 
@@ -45,16 +55,40 @@ export class EmailService {
       await this.emailQueueService.queueWelcomeEmail(userEmail, data);
       this.logger.log(`Queued welcome email for ${userEmail}`);
     } catch (error) {
-      this.logger.error(`Failed to queue welcome email for ${userEmail}: ${error.message}`);
+      this.logger.error(
+        `Failed to queue welcome email for ${userEmail}: ${error.message}`,
+      );
     }
   }
 
-  async sendPasswordResetEmail(userEmail: string, data: PasswordResetEmailData) {
+  async sendPasswordResetEmail(
+    userEmail: string,
+    data: PasswordResetEmailData,
+  ) {
     try {
       await this.emailQueueService.queuePasswordResetEmail(userEmail, data);
       this.logger.log(`Queued password reset email for ${userEmail}`);
     } catch (error) {
-      this.logger.error(`Failed to queue password reset email for ${userEmail}: ${error.message}`);
+      this.logger.error(
+        `Failed to queue password reset email for ${userEmail}: ${error.message}`,
+      );
+    }
+  }
+
+  async sendAdminInvitationEmail(
+    userEmail: string,
+    data: AdminInviteEmailData,
+  ) {
+    try {
+      await this.emailQueueService.queueAdminInviteEmail(userEmail, {
+        ...data,
+        email: userEmail,
+      });
+      this.logger.log(`Queued admin invitation email for ${userEmail}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue admin invitation email for ${userEmail}: ${error.message}`,
+      );
     }
   }
 }

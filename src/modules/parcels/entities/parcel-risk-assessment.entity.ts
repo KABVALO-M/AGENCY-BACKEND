@@ -51,4 +51,3 @@ export class ParcelRiskAssessment {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

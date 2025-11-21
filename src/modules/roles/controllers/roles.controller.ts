@@ -45,9 +45,7 @@ export class RolesController {
     summary: 'Get role by name',
     description: 'Looks up a single role using the predefined role enum.',
   })
-  async findOne(
-    @Param('name', new ParseEnumPipe(RoleName)) name: RoleName,
-  ) {
+  async findOne(@Param('name', new ParseEnumPipe(RoleName)) name: RoleName) {
     return this.rolesService.findByName(name);
   }
 

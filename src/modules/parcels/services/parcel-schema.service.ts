@@ -167,9 +167,13 @@ export class ParcelSchemaService implements OnModuleInit {
     return [...this.trackedViews];
   }
 
-  async refreshMaterializedView(viewName: ParcelMaterializedView): Promise<void> {
+  async refreshMaterializedView(
+    viewName: ParcelMaterializedView,
+  ): Promise<void> {
     if (!this.trackedViews.includes(viewName)) {
-      this.logger.warn(`Attempted to refresh untracked materialized view: ${viewName}`);
+      this.logger.warn(
+        `Attempted to refresh untracked materialized view: ${viewName}`,
+      );
       return;
     }
 
@@ -180,7 +184,9 @@ export class ParcelSchemaService implements OnModuleInit {
     );
 
     try {
-      await this.dataSource.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
+      await this.dataSource.query(
+        `REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`,
+      );
       const duration = Date.now() - startTime;
       await this.dataSource.query(
         `UPDATE materialized_view_refreshes
@@ -196,7 +202,10 @@ export class ParcelSchemaService implements OnModuleInit {
          WHERE "viewName" = $1`,
         [viewName, err.message],
       );
-      this.logger.error(`Failed refreshing materialized view ${viewName}`, err.stack);
+      this.logger.error(
+        `Failed refreshing materialized view ${viewName}`,
+        err.stack,
+      );
       throw err;
     }
   }

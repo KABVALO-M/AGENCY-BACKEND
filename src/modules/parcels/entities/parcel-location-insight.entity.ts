@@ -57,4 +57,3 @@ export class ParcelLocationInsight {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

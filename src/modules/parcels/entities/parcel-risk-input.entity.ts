@@ -54,4 +54,3 @@ export class ParcelRiskInput {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

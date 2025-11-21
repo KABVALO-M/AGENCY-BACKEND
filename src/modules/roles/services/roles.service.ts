@@ -54,7 +54,8 @@ export class RolesService implements OnModuleInit {
     }
 
     const exists = await this.roleRepo.findOne({ where: { name: dto.name } });
-    if (exists) throw new ConflictException(`Role "${dto.name}" already exists`);
+    if (exists)
+      throw new ConflictException(`Role "${dto.name}" already exists`);
 
     const role = this.roleRepo.create(dto);
     const created = await this.roleRepo.save(role);
@@ -66,6 +67,13 @@ export class RolesService implements OnModuleInit {
     const roles = await this.roleRepo.find();
     this.logger.debug(`Fetched ${roles.length} roles`);
     return roles;
+  }
+
+  async findById(id: string): Promise<Role> {
+    const role = await this.roleRepo.findOne({ where: { id } });
+    if (!role) throw new NotFoundException('Role not found');
+    this.logger.debug(`Fetched role by id "${id}"`);
+    return role;
   }
 
   async findByName(name: RoleName): Promise<Role> {
@@ -90,7 +98,9 @@ export class RolesService implements OnModuleInit {
     if (!role) throw new NotFoundException('Role not found');
 
     if (ALLOWED_ROLE_NAMES.includes(role.name)) {
-      throw new ConflictException(`Default role "${role.name}" cannot be deleted`);
+      throw new ConflictException(
+        `Default role "${role.name}" cannot be deleted`,
+      );
     }
 
     await this.roleRepo.remove(role);
@@ -98,14 +108,18 @@ export class RolesService implements OnModuleInit {
     return { message: `Role "${role.name}" deleted successfully` };
   }
 
-  async addPermissionToRole(roleId: string, permissionId: string): Promise<Role> {
+  async addPermissionToRole(
+    roleId: string,
+    permissionId: string,
+  ): Promise<Role> {
     const role = await this.roleRepo.findOne({
       where: { id: roleId },
       relations: ['permissions'],
     });
     const perm = await this.permRepo.findOne({ where: { id: permissionId } });
 
-    if (!role || !perm) throw new NotFoundException('Role or permission not found');
+    if (!role || !perm)
+      throw new NotFoundException('Role or permission not found');
 
     const alreadyExists = role.permissions.some((p) => p.id === permissionId);
     if (alreadyExists)

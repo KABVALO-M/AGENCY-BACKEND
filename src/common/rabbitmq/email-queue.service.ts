@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import {
+  AdminInviteEmailData,
   EmailVerificationData,
   PasswordResetEmailData,
   WelcomeEmailData,
@@ -13,10 +14,7 @@ export class EmailQueueService {
 
   constructor(@Inject('EMAIL_QUEUE') private readonly client: ClientProxy) {}
 
-  async queueEmailVerification(
-    userEmail: string,
-    data: EmailVerificationData,
-  ) {
+  async queueEmailVerification(userEmail: string, data: EmailVerificationData) {
     try {
       await lastValueFrom(
         this.client.emit('send-email-verification', { userEmail, data }),
@@ -55,6 +53,23 @@ export class EmailQueueService {
     } catch (error) {
       this.logger.error(
         `Failed to queue password reset email for ${userEmail}: ${error.message}`,
+      );
+      throw error;
+    }
+  }
+
+  async queueAdminInviteEmail(
+    userEmail: string,
+    data: AdminInviteEmailData,
+  ) {
+    try {
+      await lastValueFrom(
+        this.client.emit('send-admin-invite-email', { userEmail, data }),
+      );
+      this.logger.log(`Queued admin invite email for ${userEmail}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue admin invite email for ${userEmail}: ${error.message}`,
       );
       throw error;
     }

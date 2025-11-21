@@ -4,4 +4,3 @@ export enum ParcelRiskBand {
   HIGH = 'HIGH',
   CRITICAL = 'CRITICAL',
 }
-

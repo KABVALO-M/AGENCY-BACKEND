@@ -67,7 +67,11 @@ export class ParcelIngestionService {
     const auditUser = options.user?.email ?? options.user?.id ?? 'system';
 
     if (typeof options.providedPopulation === 'number') {
-      await this.recordPopulationStat(parcel, options.providedPopulation, auditUser);
+      await this.recordPopulationStat(
+        parcel,
+        options.providedPopulation,
+        auditUser,
+      );
     }
 
     if (options.geometryChanged ?? options.reason === 'create') {
@@ -151,7 +155,13 @@ export class ParcelIngestionService {
 
     for (const [metric, value] of entries) {
       if (typeof value !== 'number') continue;
-      await this.upsertRiskInput(parcel, metric, value, createdBy, sample.source);
+      await this.upsertRiskInput(
+        parcel,
+        metric,
+        value,
+        createdBy,
+        sample.source,
+      );
     }
   }
 
@@ -269,4 +279,3 @@ export class ParcelIngestionService {
     }
   }
 }
-

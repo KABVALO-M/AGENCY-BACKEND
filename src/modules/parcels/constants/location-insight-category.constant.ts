@@ -6,4 +6,3 @@ export enum LocationInsightCategory {
   DEVELOPMENT = 'DEVELOPMENT',
   OTHER = 'OTHER',
 }
-

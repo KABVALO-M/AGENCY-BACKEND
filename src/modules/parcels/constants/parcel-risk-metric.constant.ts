@@ -11,4 +11,3 @@ export enum ParcelRiskMetric {
   INFRASTRUCTURE_ACCESS = 'INFRASTRUCTURE_ACCESS',
   CUSTOM = 'CUSTOM',
 }
-

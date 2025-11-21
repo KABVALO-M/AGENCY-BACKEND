@@ -38,7 +38,8 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register a new user account',
-    description: 'Creates an account and sends a verification email to the user.',
+    description:
+      'Creates an account and sends a verification email to the user.',
   })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -69,9 +70,7 @@ export class AuthController {
     summary: 'Refresh access token',
     description: 'Exchanges a valid refresh token for a new access token pair.',
   })
-  async refresh(
-    @Body() dto: RefreshTokenDto,
-  ): Promise<AuthResponseDto> {
+  async refresh(@Body() dto: RefreshTokenDto): Promise<AuthResponseDto> {
     return this.authService.refreshTokens(dto.refreshToken);
   }
 
@@ -80,7 +79,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Returns the authenticated user details using the access token.',
+    description:
+      'Returns the authenticated user details using the access token.',
   })
   async me(@CurrentUser('id') userId: string) {
     return this.authService.getCurrentUser(userId);
@@ -123,7 +123,8 @@ export class AuthController {
   @ApiBody({ type: VerifyEmailDto })
   @ApiOperation({
     summary: 'Verify email address',
-    description: 'Accepts a verification token sent via email to activate the account.',
+    description:
+      'Accepts a verification token sent via email to activate the account.',
   })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.token);
@@ -156,7 +157,8 @@ export class AuthController {
   @ApiBody({ type: ResendVerificationDto })
   @ApiOperation({
     summary: 'Resend verification email',
-    description: 'Issues a new verification token to the provided email address.',
+    description:
+      'Issues a new verification token to the provided email address.',
   })
   async resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerification(dto.email);

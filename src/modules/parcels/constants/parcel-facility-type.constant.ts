@@ -12,4 +12,3 @@ export enum ParcelFacilityType {
   WATER_POINT = 'WATER_POINT',
   OTHER = 'OTHER',
 }
-

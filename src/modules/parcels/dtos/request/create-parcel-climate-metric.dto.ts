@@ -10,32 +10,50 @@ import {
 import type { Geometry } from 'geojson';
 
 export class CreateParcelClimateMetricDto {
-  @ApiPropertyOptional({ description: 'Date for which the measurement applies', example: '2024-11-01' })
+  @ApiPropertyOptional({
+    description: 'Date for which the measurement applies',
+    example: '2024-11-01',
+  })
   @IsOptional()
   @IsDateString()
   metricDate?: string;
 
-  @ApiPropertyOptional({ description: 'Average temperature in Celsius', example: 27.4 })
+  @ApiPropertyOptional({
+    description: 'Average temperature in Celsius',
+    example: 27.4,
+  })
   @IsOptional()
   @IsNumber()
   avgTemperatureC?: number;
 
-  @ApiPropertyOptional({ description: 'Maximum temperature in Celsius', example: 33.1 })
+  @ApiPropertyOptional({
+    description: 'Maximum temperature in Celsius',
+    example: 33.1,
+  })
   @IsOptional()
   @IsNumber()
   maxTemperatureC?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum temperature in Celsius', example: 21.9 })
+  @ApiPropertyOptional({
+    description: 'Minimum temperature in Celsius',
+    example: 21.9,
+  })
   @IsOptional()
   @IsNumber()
   minTemperatureC?: number;
 
-  @ApiPropertyOptional({ description: 'Rainfall in millimeters', example: 120.5 })
+  @ApiPropertyOptional({
+    description: 'Rainfall in millimeters',
+    example: 120.5,
+  })
   @IsOptional()
   @IsNumber()
   rainfallMm?: number;
 
-  @ApiPropertyOptional({ description: 'Relative humidity percentage', example: 70 })
+  @ApiPropertyOptional({
+    description: 'Relative humidity percentage',
+    example: 70,
+  })
   @IsOptional()
   @IsNumber()
   humidityPercentage?: number;
@@ -45,22 +63,34 @@ export class CreateParcelClimateMetricDto {
   @IsNumber()
   floodRiskScore?: number;
 
-  @ApiPropertyOptional({ description: 'Drought risk score (0-100)', example: 30 })
+  @ApiPropertyOptional({
+    description: 'Drought risk score (0-100)',
+    example: 30,
+  })
   @IsOptional()
   @IsNumber()
   droughtRiskScore?: number;
 
-  @ApiPropertyOptional({ description: 'Sea level risk score (0-100)', example: 75 })
+  @ApiPropertyOptional({
+    description: 'Sea level risk score (0-100)',
+    example: 75,
+  })
   @IsOptional()
   @IsNumber()
   seaLevelRiskScore?: number;
 
-  @ApiPropertyOptional({ description: 'Elevation in meters sourced from DEM', example: 1420 })
+  @ApiPropertyOptional({
+    description: 'Elevation in meters sourced from DEM',
+    example: 1420,
+  })
   @IsOptional()
   @IsNumber()
   elevationMeters?: number;
 
-  @ApiPropertyOptional({ description: 'Slope degrees from terrain model', example: 5.6 })
+  @ApiPropertyOptional({
+    description: 'Slope degrees from terrain model',
+    example: 5.6,
+  })
   @IsOptional()
   @IsNumber()
   slopeDegrees?: number;
@@ -74,13 +104,19 @@ export class CreateParcelClimateMetricDto {
   @IsObject()
   sampleArea?: Geometry;
 
-  @ApiPropertyOptional({ description: 'Data source (API, dataset, etc.)', example: 'SRTM Tile 37' })
+  @ApiPropertyOptional({
+    description: 'Data source (API, dataset, etc.)',
+    example: 'SRTM Tile 37',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(150)
   dataSource?: string;
 
-  @ApiPropertyOptional({ description: 'Timestamp when data was collected', example: '2024-11-01T14:00:00Z' })
+  @ApiPropertyOptional({
+    description: 'Timestamp when data was collected',
+    example: '2024-11-01T14:00:00Z',
+  })
   @IsOptional()
   @IsDateString()
   collectedAt?: Date;

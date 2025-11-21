@@ -57,4 +57,3 @@ export class ParcelPopulationStat {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

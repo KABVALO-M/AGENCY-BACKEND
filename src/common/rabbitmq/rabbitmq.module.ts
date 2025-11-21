@@ -28,7 +28,7 @@ import { EmailQueueService } from './email-queue.service';
       },
     ]),
   ],
-//   controllers: [EmailQueueConsumer],
+  //   controllers: [EmailQueueConsumer],
   providers: [EmailQueueService],
   exports: [ClientsModule, EmailQueueService],
 })

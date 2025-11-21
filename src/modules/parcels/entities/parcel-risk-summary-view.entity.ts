@@ -47,4 +47,3 @@ export class ParcelRiskSummaryView {
   @ViewColumn({ name: 'climate_metric_date' })
   climateMetricDate: Date | null;
 }
-

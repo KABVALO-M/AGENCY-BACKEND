@@ -34,4 +34,3 @@ export class MaterializedViewRefresh {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

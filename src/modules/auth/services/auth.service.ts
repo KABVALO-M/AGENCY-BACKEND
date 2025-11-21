@@ -43,66 +43,74 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto): Promise<{ message: string }> {
-  const existing = await this.userRepo.findOne({ where: { email: dto.email } });
-  if (existing) throw new ConflictException(AUTH_MESSAGES.EMAIL_EXISTS);
+    const existing = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (existing) throw new ConflictException(AUTH_MESSAGES.EMAIL_EXISTS);
 
-  const hashedPassword = await bcrypt.hash(dto.password, 10);
-  const defaultRole = await this.rolesService.findByName(RoleName.User);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const defaultRole = await this.rolesService.findByName(RoleName.User);
 
-  const user = this.userRepo.create({
-    ...dto,
-    password: hashedPassword,
-    role: defaultRole,
-    isActive: false,
-    emailVerified: false,
-  });
+    const user = this.userRepo.create({
+      ...dto,
+      password: hashedPassword,
+      role: defaultRole,
+      isActive: false,
+      emailVerified: false,
+    });
 
-  await this.userRepo.save(user);
+    await this.userRepo.save(user);
 
-  // Send email asynchronously - don't block registration
-  this.sendVerificationEmailAsync(user).catch(error => {
-    this.logger.error(`Failed to send verification email for ${user.email}`, error.stack);
-  });
+    // Send email asynchronously - don't block registration
+    this.sendVerificationEmailAsync(user).catch((error) => {
+      this.logger.error(
+        `Failed to send verification email for ${user.email}`,
+        error.stack,
+      );
+    });
 
-  this.logger.event(`User registered: ${user.email}`);
+    this.logger.event(`User registered: ${user.email}`);
 
-  return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_SENT };
-}
-
-private async queueVerificationEmail(user: User): Promise<void> {
-  const verification = await this.createEmailVerificationToken(user);
-  await this.emailService.sendEmailVerification(user.email, {
-    firstName: user.firstName,
-    verificationToken: verification.token,
-    expiresAt: verification.expiresAt.toISOString(),
-  });
-  this.logger.event(`Queued verification email for: ${user.email}`);
-}
-
-private async sendVerificationEmailAsync(user: User): Promise<void> {
-  try {
-    await this.queueVerificationEmail(user);
-  } catch (error) {
-    // Log but don't throw - registration should still succeed
-    const reason = error instanceof Error ? error.message : 'Unknown error';
-    this.logger.error(
-      `Failed to queue verification email: ${reason}`,
-      error instanceof Error ? error.stack : undefined,
-    );
+    return { message: AUTH_MESSAGES.VERIFICATION_EMAIL_SENT };
   }
-}
 
-private async queuePasswordResetEmail(user: User): Promise<void> {
-  const reset = await this.createPasswordResetToken(user);
-  await this.emailService.sendPasswordResetEmail(user.email, {
-    firstName: user.firstName,
-    resetToken: reset.token,
-    expiresAt: reset.expiresAt.toISOString(),
-  });
-  this.logger.event(`Queued password reset email for: ${user.email}`);
-}
+  private async queueVerificationEmail(user: User): Promise<void> {
+    const verification = await this.createEmailVerificationToken(user);
+    await this.emailService.sendEmailVerification(user.email, {
+      firstName: user.firstName,
+      verificationToken: verification.token,
+      expiresAt: verification.expiresAt.toISOString(),
+    });
+    this.logger.event(`Queued verification email for: ${user.email}`);
+  }
 
-  async validateUser(email: string, password: string): Promise<AuthenticatedUser> {
+  private async sendVerificationEmailAsync(user: User): Promise<void> {
+    try {
+      await this.queueVerificationEmail(user);
+    } catch (error) {
+      // Log but don't throw - registration should still succeed
+      const reason = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to queue verification email: ${reason}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private async queuePasswordResetEmail(user: User): Promise<void> {
+    const reset = await this.createPasswordResetToken(user);
+    await this.emailService.sendPasswordResetEmail(user.email, {
+      firstName: user.firstName,
+      resetToken: reset.token,
+      expiresAt: reset.expiresAt.toISOString(),
+    });
+    this.logger.event(`Queued password reset email for: ${user.email}`);
+  }
+
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<AuthenticatedUser> {
     const user = await this.userRepo
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
@@ -317,8 +325,7 @@ private async queuePasswordResetEmail(user: User): Promise<void> {
       await this.queuePasswordResetEmail(user);
       this.logger.event(`Password reset requested for: ${user.email}`);
     } catch (error) {
-      const reason =
-        error instanceof Error ? error.message : 'Unknown error';
+      const reason = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to queue password reset email: ${reason}`,
         error instanceof Error ? error.stack : undefined,
@@ -417,11 +424,11 @@ private async queuePasswordResetEmail(user: User): Promise<void> {
       tokenVersion,
       lastLogin,
       role: {
-          id: role.id,
-          name: role.name,
-          description: role.description,
-          permissions:
-            role.permissions?.map((permission) => ({
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        permissions:
+          role.permissions?.map((permission) => ({
             id: permission.id,
             name: permission.name,
             description: permission.description,

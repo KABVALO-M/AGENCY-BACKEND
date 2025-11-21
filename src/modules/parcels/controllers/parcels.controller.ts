@@ -82,7 +82,10 @@ export class ParcelsController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'Parcel 17 - Downtown' },
-        description: { type: 'string', example: 'Vacant lot close to the river.' },
+        description: {
+          type: 'string',
+          example: 'Vacant lot close to the river.',
+        },
         titleNumber: { type: 'string', example: 'TTX-009123' },
         geometry: {
           type: 'object',
@@ -112,7 +115,8 @@ export class ParcelsController {
         shapefile: {
           type: 'string',
           format: 'binary',
-          description: 'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
+          description:
+            'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
         },
       },
       required: ['name'],
@@ -141,7 +145,10 @@ export class ParcelsController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFiles()
-    files: { images?: Express.Multer.File[]; shapefile?: Express.Multer.File[] },
+    files: {
+      images?: Express.Multer.File[];
+      shapefile?: Express.Multer.File[];
+    },
     @Body() dto: CreateParcelDto,
   ) {
     const images = files?.images;
@@ -208,7 +215,8 @@ export class ParcelsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get materialized view statuses',
-    description: 'Lists the tracked parcel analytics materialized views and their last refresh metadata.',
+    description:
+      'Lists the tracked parcel analytics materialized views and their last refresh metadata.',
   })
   async getMaterializedViewStatus() {
     return this.parcelsService.getMaterializedViewStatuses();
@@ -220,7 +228,8 @@ export class ParcelsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Trigger a materialized view refresh',
-    description: 'Refreshes the parcel analytics materialized views immediately.',
+    description:
+      'Refreshes the parcel analytics materialized views immediately.',
   })
   async refreshMaterializedViews(@Body() dto: RefreshMaterializedViewDto) {
     return this.parcelsService.refreshMaterializedViews(dto);
@@ -289,12 +298,10 @@ export class ParcelsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Proxy GeoServer WMS requests',
-    description: 'Fetches WMS tiles via the backend to avoid browser cross-origin issues.',
+    description:
+      'Fetches WMS tiles via the backend to avoid browser cross-origin issues.',
   })
-  async proxyWms(
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
+  async proxyWms(@Req() req: Request, @Res() res: Response) {
     const result = await this.geoServerSyncService.proxyWmsRequest(req.query);
     this.setProxyCorsHeaders(res, req.headers.origin);
     res.setHeader('Content-Type', result.contentType ?? 'image/png');
@@ -413,7 +420,8 @@ export class ParcelsController {
         shapefile: {
           type: 'string',
           format: 'binary',
-          description: 'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
+          description:
+            'Geo data file (.zip shapefile, .kml, .kmz, or .geojson)',
         },
       },
     },

@@ -5,7 +5,9 @@ import * as nodemailer from 'nodemailer';
 import { EmailVerificationTemplate } from '../templates/email-verification.template';
 import { WelcomeEmailTemplate } from '../templates/welcome-email.template';
 import { PasswordResetTemplate } from '../templates/password-reset.template';
+import { AdminInviteTemplate } from '../templates/admin-invite.template';
 import {
+  AdminInviteEmailData,
   EmailVerificationData,
   PasswordResetEmailData,
   WelcomeEmailData,
@@ -125,6 +127,33 @@ export class EmailQueueConsumer {
     } catch (error) {
       this.logger.error(
         `Failed to send password reset email to ${payload.userEmail}: ${error.message}`,
+      );
+      channel.nack(originalMsg, false, false);
+    }
+  }
+
+  @EventPattern('send-admin-invite-email')
+  async handleAdminInviteEmail(
+    @Payload() payload: { userEmail: string; data: AdminInviteEmailData },
+    @Ctx() context: RmqContext,
+  ) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const html = AdminInviteTemplate.generate(payload.data, this.appUrl);
+      await this.transporter.sendMail({
+        from: this.fromAddress,
+        to: payload.userEmail,
+        subject: 'Your Terracore account is ready',
+        html,
+      });
+
+      this.logger.log(`Admin invite email sent to ${payload.userEmail}`);
+      channel.ack(originalMsg);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send admin invite email to ${payload.userEmail}: ${error.message}`,
       );
       channel.nack(originalMsg, false, false);
     }

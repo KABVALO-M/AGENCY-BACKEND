@@ -69,8 +69,10 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  const defaultOrigin = configService.get<string>('APP_URL') || 'http://localhost:3001';
-  const allowedOrigins = parsedOrigins.length > 0 ? parsedOrigins : [defaultOrigin];
+  const defaultOrigin =
+    configService.get<string>('APP_URL') || 'http://localhost:3001';
+  const allowedOrigins =
+    parsedOrigins.length > 0 ? parsedOrigins : [defaultOrigin];
 
   app.enableCors({
     origin: allowedOrigins,
@@ -120,7 +122,9 @@ async function bootstrap() {
   const port = configService.get<number>('APP_PORT', 3000);
   await app.listen(port, '0.0.0.0');
 
-  logger.log(`🚀 Terracore API running at: http://localhost:${port}/${globalPrefix}`);
+  logger.log(
+    `🚀 Terracore API running at: http://localhost:${port}/${globalPrefix}`,
+  );
   logger.log(`Swagger docs available at: http://localhost:${port}/docs`);
 }
 bootstrap().catch((err) => {

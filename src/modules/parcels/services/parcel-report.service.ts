@@ -99,10 +99,7 @@ export class ParcelReportService {
       .moveDown();
 
     if (mapImage) {
-      doc
-        .fontSize(14)
-        .text('Map Snapshot', { underline: true })
-        .moveDown(0.5);
+      doc.fontSize(14).text('Map Snapshot', { underline: true }).moveDown(0.5);
       doc.image(mapImage, {
         width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
         align: 'center',
@@ -110,10 +107,7 @@ export class ParcelReportService {
       doc.moveDown();
     }
 
-    doc
-      .fontSize(14)
-      .text('Risk Summary', { underline: true })
-      .moveDown(0.5);
+    doc.fontSize(14).text('Risk Summary', { underline: true }).moveDown(0.5);
 
     if (riskSummary) {
       doc

@@ -58,7 +58,10 @@ export class GeoServerSyncService {
         `${this.defaultStyleName}.sld`,
       );
 
-    const defaultDbHost = this.configService.get<string>('DB_HOST', 'localhost');
+    const defaultDbHost = this.configService.get<string>(
+      'DB_HOST',
+      'localhost',
+    );
     const defaultDbPort = this.configService.get<string>('DB_PORT', '55432');
     const defaultDbUser = this.configService.get<string>(
       'DB_USER',
@@ -78,14 +81,8 @@ export class GeoServerSyncService {
     );
 
     this.dbConfig = {
-      host: this.configService.get<string>(
-        'GEOSERVER_DB_HOST',
-        defaultDbHost,
-      ),
-      port: this.configService.get<string>(
-        'GEOSERVER_DB_PORT',
-        defaultDbPort,
-      ),
+      host: this.configService.get<string>('GEOSERVER_DB_HOST', defaultDbHost),
+      port: this.configService.get<string>('GEOSERVER_DB_PORT', defaultDbPort),
       database: this.configService.get<string>(
         'GEOSERVER_DB_NAME',
         defaultDbName,
@@ -94,10 +91,7 @@ export class GeoServerSyncService {
         'GEOSERVER_DB_SCHEMA',
         defaultDbSchema,
       ),
-      user: this.configService.get<string>(
-        'GEOSERVER_DB_USER',
-        defaultDbUser,
-      ),
+      user: this.configService.get<string>('GEOSERVER_DB_USER', defaultDbUser),
       password: this.configService.get<string>(
         'GEOSERVER_DB_PASS',
         defaultDbPass,
@@ -141,15 +135,11 @@ export class GeoServerSyncService {
       return;
     }
 
-    await this.request(
-      'POST',
-      '/workspaces',
-      {
-        workspace: {
-          name: this.workspace,
-        },
+    await this.request('POST', '/workspaces', {
+      workspace: {
+        name: this.workspace,
       },
-    );
+    });
   }
 
   private async ensureDataStore(): Promise<void> {
@@ -310,7 +300,8 @@ export class GeoServerSyncService {
 
     const currentConfig = await response.json();
     const currentStyles =
-      currentConfig?.layer?.styles?.style && Array.isArray(currentConfig.layer.styles.style)
+      currentConfig?.layer?.styles?.style &&
+      Array.isArray(currentConfig.layer.styles.style)
         ? currentConfig.layer.styles.style
         : currentConfig?.layer?.styles?.style
           ? [currentConfig.layer.styles.style]
@@ -345,7 +336,10 @@ export class GeoServerSyncService {
   }
 
   private async exists(path: string): Promise<boolean> {
-    const response = await this.requestRaw('GET', path.replace(/\.json$/, '.json'));
+    const response = await this.requestRaw(
+      'GET',
+      path.replace(/\.json$/, '.json'),
+    );
     if (response.status === 200) {
       return true;
     }
@@ -424,9 +418,7 @@ export class GeoServerSyncService {
   ): Promise<globalThis.Response> {
     const base = this.baseUrl.replace(/\/$/, '');
     const url = `${base}/rest${path}`;
-    this.logger.debug(
-      `GeoServer REST request: ${method.toUpperCase()} ${url}`,
-    );
+    this.logger.debug(`GeoServer REST request: ${method.toUpperCase()} ${url}`);
     const headers: Record<string, string> = this.buildAuthHeaders({
       Accept: 'application/json',
     });
@@ -460,7 +452,10 @@ export class GeoServerSyncService {
     url.searchParams.set('service', 'WMS');
     url.searchParams.set('version', '1.3.0');
     url.searchParams.set('request', 'GetLegendGraphic');
-    url.searchParams.set('layer', layer.includes(':') ? layer : `${this.workspace}:${layer}`);
+    url.searchParams.set(
+      'layer',
+      layer.includes(':') ? layer : `${this.workspace}:${layer}`,
+    );
     url.searchParams.set('format', format ?? 'image/png');
     url.searchParams.set('width', String(width ?? 20));
     url.searchParams.set('height', String(height ?? 20));
@@ -469,9 +464,7 @@ export class GeoServerSyncService {
     }
 
     const requestUrl = url.toString();
-    this.logger.log(
-      `Fetching legend from GeoServer: ${requestUrl}`,
-    );
+    this.logger.log(`Fetching legend from GeoServer: ${requestUrl}`);
     const response = await fetch(requestUrl, {
       headers: this.buildAuthHeaders({
         Accept: 'image/png, image/*;q=0.8, */*;q=0.5',
@@ -479,12 +472,8 @@ export class GeoServerSyncService {
     });
     if (!response.ok) {
       const text = await response.text();
-      this.logger.error(
-        `Legend request failed (${response.status}): ${text}`,
-      );
-      throw new Error(
-        `Legend request failed: ${response.status} ${text}`,
-      );
+      this.logger.error(`Legend request failed (${response.status}): ${text}`);
+      throw new Error(`Legend request failed: ${response.status} ${text}`);
     }
     const arrayBuffer = await response.arrayBuffer();
     this.logger.debug(
@@ -513,9 +502,7 @@ export class GeoServerSyncService {
     url.search = searchParams.toString();
 
     const requestUrl = url.toString();
-    this.logger.debug(
-      `Proxying WMS request to GeoServer: ${requestUrl}`,
-    );
+    this.logger.debug(`Proxying WMS request to GeoServer: ${requestUrl}`);
     const response = await fetch(requestUrl, {
       headers: this.buildAuthHeaders({
         Accept: 'image/png, image/*;q=0.8, */*;q=0.5',
@@ -526,9 +513,7 @@ export class GeoServerSyncService {
       this.logger.error(
         `WMS proxy request failed (${response.status}): ${text}`,
       );
-      throw new Error(
-        `WMS proxy request failed: ${response.status} ${text}`,
-      );
+      throw new Error(`WMS proxy request failed: ${response.status} ${text}`);
     }
     const arrayBuffer = await response.arrayBuffer();
     this.logger.debug(

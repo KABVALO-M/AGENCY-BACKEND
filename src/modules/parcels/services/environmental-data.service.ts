@@ -51,7 +51,9 @@ export class EnvironmentalDataService {
       const bbox = turf.bbox(geometry);
       const bottomLeft = turf.point([bbox[0], bbox[1]]);
       const topRight = turf.point([bbox[2], bbox[3]]);
-      const diagonalKm = turf.distance(bottomLeft, topRight, { units: 'kilometers' });
+      const diagonalKm = turf.distance(bottomLeft, topRight, {
+        units: 'kilometers',
+      });
       if (!diagonalKm || diagonalKm === 0) {
         return undefined;
       }
@@ -129,4 +131,3 @@ export class EnvironmentalDataService {
     }
   }
 }
-

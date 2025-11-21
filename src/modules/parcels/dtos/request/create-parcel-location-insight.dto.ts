@@ -10,16 +10,25 @@ import {
 import { LocationInsightCategory } from '../../constants/location-insight-category.constant';
 
 export class CreateParcelLocationInsightDto {
-  @ApiProperty({ enum: LocationInsightCategory, description: 'Insight category' })
+  @ApiProperty({
+    enum: LocationInsightCategory,
+    description: 'Insight category',
+  })
   @IsEnum(LocationInsightCategory)
   category: LocationInsightCategory;
 
-  @ApiProperty({ description: 'Title for the insight', example: 'New highway interchange approved' })
+  @ApiProperty({
+    description: 'Title for the insight',
+    example: 'New highway interchange approved',
+  })
   @IsString()
   @MaxLength(200)
   title: string;
 
-  @ApiProperty({ description: 'Narrative description', example: 'Construction expected to drive accessibility' })
+  @ApiProperty({
+    description: 'Narrative description',
+    example: 'Construction expected to drive accessibility',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -30,7 +39,10 @@ export class CreateParcelLocationInsightDto {
   @MaxLength(80)
   status?: string;
 
-  @ApiProperty({ description: 'Expected completion date', example: '2026-06-01T00:00:00Z' })
+  @ApiProperty({
+    description: 'Expected completion date',
+    example: '2026-06-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString()
   expectedCompletion?: Date;
@@ -45,10 +57,12 @@ export class CreateParcelLocationInsightDto {
   @IsNumber()
   impactScore?: number;
 
-  @ApiProperty({ description: 'Source or reference', example: 'Ministry of Infrastructure' })
+  @ApiProperty({
+    description: 'Source or reference',
+    example: 'Ministry of Infrastructure',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(150)
   source?: string;
 }
-

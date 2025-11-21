@@ -18,12 +18,18 @@ export class CreateParcelFacilityDto {
   @IsEnum(ParcelFacilityType)
   facilityType: ParcelFacilityType;
 
-  @ApiProperty({ description: 'Facility name', example: 'St. Francis Hospital' })
+  @ApiProperty({
+    description: 'Facility name',
+    example: 'St. Francis Hospital',
+  })
   @IsString()
   @MaxLength(150)
   name: string;
 
-  @ApiPropertyOptional({ description: 'Short description', example: 'Regional referral hospital with ER' })
+  @ApiPropertyOptional({
+    description: 'Short description',
+    example: 'Regional referral hospital with ER',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -33,7 +39,10 @@ export class CreateParcelFacilityDto {
   @IsNumber()
   importanceScore?: number;
 
-  @ApiPropertyOptional({ description: 'Distance from parcel centroid in meters', example: 450 })
+  @ApiPropertyOptional({
+    description: 'Distance from parcel centroid in meters',
+    example: 450,
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -47,18 +56,27 @@ export class CreateParcelFacilityDto {
   @IsObject()
   geometry: Geometry;
 
-  @ApiPropertyOptional({ description: 'Arbitrary metadata for the facility', example: { beds: 120 } })
+  @ApiPropertyOptional({
+    description: 'Arbitrary metadata for the facility',
+    example: { beds: 120 },
+  })
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Source of the information', example: 'Admin entry' })
+  @ApiPropertyOptional({
+    description: 'Source of the information',
+    example: 'Admin entry',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(150)
   source?: string;
 
-  @ApiPropertyOptional({ description: 'When the information was collected', example: '2024-10-10T00:00:00Z' })
+  @ApiPropertyOptional({
+    description: 'When the information was collected',
+    example: '2024-10-10T00:00:00Z',
+  })
   @IsOptional()
   @IsOptional()
   @IsDateString()

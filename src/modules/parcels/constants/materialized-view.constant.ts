@@ -4,4 +4,3 @@ export const PARCEL_MATERIALIZED_VIEWS = [
 ] as const;
 
 export type ParcelMaterializedView = (typeof PARCEL_MATERIALIZED_VIEWS)[number];
-
