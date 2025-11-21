@@ -70,6 +70,20 @@ export class UsersController {
     return users.map((user) => UserResponseDto.fromEntity(user));
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get current user profile',
+    description: 'Returns the profile for the authenticated user.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  async me(
+    @CurrentUser('id') userId: string,
+  ): Promise<UserResponseDto> {
+    const user = await this.usersService.findById(userId);
+    return UserResponseDto.fromEntity(user);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
