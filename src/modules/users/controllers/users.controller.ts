@@ -3,6 +3,8 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -63,5 +65,27 @@ export class UsersController {
 
     const users = await this.usersService.findAllExcept(currentUser.id);
     return users.map((user) => UserResponseDto.fromEntity(user));
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Admin: get user by id',
+    description: 'Returns the user profile for the specified identifier.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ): Promise<UserResponseDto> {
+    if (currentUser.role.name !== RoleName.Admin) {
+      throw new ForbiddenException('Only administrators can view users');
+    }
+
+    const user = await this.usersService.findById(id);
+    if (user.id === currentUser.id) {
+      return UserResponseDto.fromEntity(user);
+    }
+    return UserResponseDto.fromEntity(user);
   }
 }
