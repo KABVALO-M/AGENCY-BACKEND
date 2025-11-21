@@ -209,6 +209,77 @@ export class ParcelsController {
     return this.parcelsService.findAll({ asGeoJson: geo, status });
   }
 
+  // ──────────────────────────────── FIND CURRENT USER PARCELS ────────────────────────────────
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Retrieve parcels for the authenticated user',
+    description:
+      'Returns parcels where the requester is the owner or creator. Use `?asGeoJson=true` for GeoJSON format or `?status=available` to filter by status.',
+  })
+  @ApiQuery({
+    name: 'asGeoJson',
+    required: false,
+    type: Boolean,
+    description: 'Return results in GeoJSON format if true',
+    example: false,
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ParcelStatus,
+    description: 'Filter parcels by status (available or sold)',
+    example: ParcelStatus.AVAILABLE,
+  })
+  async findMine(
+    @CurrentUser('id') userId: string,
+    @Query('asGeoJson', new ParseBoolPipe({ optional: true }))
+    asGeoJson?: boolean,
+    @Query('status', new ParseEnumPipe(ParcelStatus, { optional: true }))
+    status?: ParcelStatus,
+  ) {
+    const geo = asGeoJson ?? false;
+    return this.parcelsService.findForUser(userId, { asGeoJson: geo, status });
+  }
+
+  // ──────────────────────────────── FIND OTHER USERS' PARCELS ────────────────────────────────
+  @Get('browse')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Browse parcels that don't belong to the authenticated user",
+    description:
+      'Returns parcels where the requester is neither the owner nor creator. Supports GeoJSON output via `?asGeoJson=true`.',
+  })
+  @ApiQuery({
+    name: 'asGeoJson',
+    required: false,
+    type: Boolean,
+    description: 'Return results in GeoJSON format if true',
+    example: false,
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ParcelStatus,
+    description: 'Filter parcels by status (available or sold)',
+    example: ParcelStatus.AVAILABLE,
+  })
+  async findOthers(
+    @CurrentUser('id') userId: string,
+    @Query('asGeoJson', new ParseBoolPipe({ optional: true }))
+    asGeoJson?: boolean,
+    @Query('status', new ParseEnumPipe(ParcelStatus, { optional: true }))
+    status?: ParcelStatus,
+  ) {
+    const geo = asGeoJson ?? false;
+    return this.parcelsService.findForOtherUsers(userId, {
+      asGeoJson: geo,
+      status,
+    });
+  }
+
   // ──────────────────────────────── MATERIALIZED VIEW STATUS ────────────────────────────────
   @Get('materialized-views/status')
   @UseGuards(JwtAuthGuard)

@@ -7,7 +7,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DeepPartial, IsNull } from 'typeorm';
+import {
+  Repository,
+  DeepPartial,
+  IsNull,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Parcel } from '../entities/parcel.entity';
 import { CreateParcelDto } from '../dtos/request/create-parcel.dto';
 import type { AuthenticatedUser } from '../../auth/types/authenticated-user.type';
@@ -173,63 +178,108 @@ export class ParcelsService {
     );
   }
 
-  // ──────────────────────────────── FIND ALL PARCELS ────────────────────────────────
-  async findAll(options?: { asGeoJson?: boolean; status?: ParcelStatus }) {
-    const { asGeoJson = false, status } = options || {};
-
-    // Base query builder
-    const query = this.parcelRepository
+  private buildParcelQuery(): SelectQueryBuilder<Parcel> {
+    return this.parcelRepository
       .createQueryBuilder('parcel')
       .leftJoinAndSelect('parcel.createdBy', 'createdBy')
       .leftJoinAndSelect('parcel.owner', 'owner')
       .where('parcel.deletedAt IS NULL')
       .orderBy('parcel.createdAt', 'DESC');
+  }
+
+  private formatParcelList(
+    parcels: Parcel[],
+    asGeoJson: boolean,
+  ): Parcel[] | { type: 'FeatureCollection'; features: any[] } {
+    if (!parcels.length) {
+      return asGeoJson ? { type: 'FeatureCollection', features: [] } : [];
+    }
+
+    if (!asGeoJson) {
+      return parcels;
+    }
+
+    const features = parcels.map((parcel) => ({
+      type: 'Feature',
+      geometry: parcel.geometry,
+      properties: {
+        id: parcel.id,
+        name: parcel.name,
+        description: parcel.description,
+        titleNumber: parcel.titleNumber,
+        area: parcel.area,
+        perimeter: parcel.perimeter,
+        population: parcel.population,
+        imageUrls: parcel.imageUrls,
+        shapefileUrl: parcel.shapefileUrl,
+        status: parcel.status,
+        createdBy: parcel.createdBy
+          ? `${parcel.createdBy.firstName} ${parcel.createdBy.lastName}`
+          : null,
+        owner: parcel.owner
+          ? `${parcel.owner.firstName} ${parcel.owner.lastName}`
+          : null,
+        createdAt: parcel.createdAt,
+      },
+    }));
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    };
+  }
+
+  // ──────────────────────────────── FIND ALL PARCELS ────────────────────────────────
+  async findAll(options?: { asGeoJson?: boolean; status?: ParcelStatus }) {
+    const { asGeoJson = false, status } = options || {};
+
+    const query = this.buildParcelQuery();
 
     if (status) {
       query.andWhere('parcel.status = :status', { status });
     }
 
     const parcels = await query.getMany();
+    return this.formatParcelList(parcels, asGeoJson);
+  }
 
-    // If no parcels
-    if (!parcels.length) {
-      return asGeoJson ? { type: 'FeatureCollection', features: [] } : [];
+  // ──────────────────────────────── FIND PARCELS FOR CURRENT USER ────────────────────────────────
+  async findForUser(
+    userId: string,
+    options?: { asGeoJson?: boolean; status?: ParcelStatus },
+  ) {
+    const { asGeoJson = false, status } = options || {};
+    const query = this.buildParcelQuery().andWhere(
+      '(createdBy.id = :userId OR owner.id = :userId)',
+      { userId },
+    );
+
+    if (status) {
+      query.andWhere('parcel.status = :status', { status });
     }
 
-    // Transform to GeoJSON format if requested
-    if (asGeoJson) {
-      const features = parcels.map((parcel) => ({
-        type: 'Feature',
-        geometry: parcel.geometry,
-        properties: {
-          id: parcel.id,
-          name: parcel.name,
-          description: parcel.description,
-          titleNumber: parcel.titleNumber,
-          area: parcel.area,
-          perimeter: parcel.perimeter,
-          population: parcel.population,
-          imageUrls: parcel.imageUrls,
-          shapefileUrl: parcel.shapefileUrl,
-          status: parcel.status,
-          createdBy: parcel.createdBy
-            ? `${parcel.createdBy.firstName} ${parcel.createdBy.lastName}`
-            : null,
-          owner: parcel.owner
-            ? `${parcel.owner.firstName} ${parcel.owner.lastName}`
-            : null,
-          createdAt: parcel.createdAt,
-        },
-      }));
+    const parcels = await query.getMany();
+    return this.formatParcelList(parcels, asGeoJson);
+  }
 
-      return {
-        type: 'FeatureCollection',
-        features,
-      };
+  // ──────────────────────────────── FIND PARCELS FOR OTHER USERS ────────────────────────────────
+  async findForOtherUsers(
+    userId: string,
+    options?: { asGeoJson?: boolean; status?: ParcelStatus },
+  ) {
+    const { asGeoJson = false, status } = options || {};
+
+    const query = this.buildParcelQuery().andWhere(
+      '(createdBy.id IS NULL OR createdBy.id <> :userId) AND (owner.id IS NULL OR owner.id <> :userId)',
+      { userId },
+    );
+
+    if (status) {
+      query.andWhere('parcel.status = :status', { status });
     }
 
-    // Default JSON format
-    return parcels;
+    const parcels = await query.getMany();
+    return this.formatParcelList(parcels, asGeoJson);
   }
 
   // ──────────────────────────────── FIND ONE PARCEL ────────────────────────────────
