@@ -651,12 +651,21 @@ export class ParcelsController {
     summary: 'Generate parcel PDF report',
   })
   async downloadReport(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.parcelReportService.generateParcelReport(id);
+    const { stream, filename } =
+      await this.parcelReportService.generateParcelReportStream(id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="parcel-${id}.pdf"`,
-    );
-    res.send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache');
+
+    stream.on('error', (error) => {
+      this.logger.error(`Failed to stream parcel report ${id}`, error.stack);
+      if (!res.headersSent) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Report failed');
+      } else {
+        res.destroy(error);
+      }
+    });
+
+    stream.pipe(res);
   }
 }

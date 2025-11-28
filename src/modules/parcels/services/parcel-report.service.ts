@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import PDFDocument from 'pdfkit';
 import { IsNull, Repository } from 'typeorm';
 import * as turf from '@turf/turf';
+import { PassThrough } from 'stream';
 import { Parcel } from '../entities/parcel.entity';
 import { PARCEL_MESSAGES } from '../messages/parcel.messages';
 import { ParcelRiskSummaryView } from '../entities/parcel-risk-summary-view.entity';
@@ -32,45 +33,37 @@ export class ParcelReportService {
     private readonly configService: ConfigService,
   ) {}
 
+  /**
+   * Returns the full PDF as a buffer (used by non-stream consumers).
+   */
   async generateParcelReport(parcelId: string): Promise<Buffer> {
-    const parcel = await this.parcelRepository.findOne({
-      where: { id: parcelId, deletedAt: IsNull() },
-      relations: ['createdBy', 'owner'],
-    });
+    const sections = await this.buildReportSections(parcelId);
+    const pdfStream = this.buildPdfStream(sections);
+    const chunks: Buffer[] = [];
 
-    if (!parcel) {
-      throw new NotFoundException(PARCEL_MESSAGES.NOT_FOUND);
-    }
-
-    const [riskSummary, insights, facilities, mapImage] = await Promise.all([
-      this.riskSummaryRepository.findOne({ where: { parcelId } }),
-      this.insightRepository.find({
-        where: { parcel: { id: parcelId } },
-        order: { createdAt: 'DESC' },
-        take: 5,
-      }),
-      this.facilityRepository.find({
-        where: { parcel: { id: parcelId } },
-        order: { importanceScore: 'DESC' },
-        take: 5,
-      }),
-      this.fetchMapSnapshot(parcel),
-    ]);
-
-    return this.buildPdf({
-      parcel,
-      riskSummary,
-      insights,
-      facilities,
-      mapImage,
+    return new Promise<Buffer>((resolve, reject) => {
+      pdfStream.on('data', (chunk) => chunks.push(chunk as Buffer));
+      pdfStream.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfStream.on('error', (err) => reject(err));
     });
   }
 
-  private async buildPdf(sections: ParcelReportSections): Promise<Buffer> {
-    const doc = new PDFDocument({ margin: 40 });
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
+  /**
+   * Builds the PDF as a stream for immediate response piping.
+   */
+  async generateParcelReportStream(parcelId: string): Promise<{
+    stream: PassThrough;
+    filename: string;
+  }> {
+    const sections = await this.buildReportSections(parcelId);
+    const stream = this.buildPdfStream(sections);
+    return { stream, filename: `parcel-${parcelId}.pdf` };
+  }
 
+  private buildPdfStream(sections: ParcelReportSections): PassThrough {
+    const doc = new PDFDocument({ margin: 40 });
+    const stream = new PassThrough();
+    doc.pipe(stream);
     const { parcel, riskSummary, insights, facilities, mapImage } = sections;
 
     doc
@@ -170,9 +163,43 @@ export class ParcelReportService {
 
     doc.end();
 
-    return new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    return stream;
+  }
+
+  private async buildReportSections(
+    parcelId: string,
+  ): Promise<ParcelReportSections> {
+    const parcel = await this.parcelRepository.findOne({
+      where: { id: parcelId, deletedAt: IsNull() },
+      relations: ['createdBy', 'owner'],
     });
+
+    if (!parcel) {
+      throw new NotFoundException(PARCEL_MESSAGES.NOT_FOUND);
+    }
+
+    const [riskSummary, insights, facilities, mapImage] = await Promise.all([
+      this.riskSummaryRepository.findOne({ where: { parcelId } }),
+      this.insightRepository.find({
+        where: { parcel: { id: parcelId } },
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.facilityRepository.find({
+        where: { parcel: { id: parcelId } },
+        order: { importanceScore: 'DESC' },
+        take: 5,
+      }),
+      this.fetchMapSnapshot(parcel),
+    ]);
+
+    return {
+      parcel,
+      riskSummary,
+      insights,
+      facilities,
+      mapImage,
+    };
   }
 
   private async fetchMapSnapshot(parcel: Parcel): Promise<Buffer | null> {
