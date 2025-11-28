@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import PDFDocument from 'pdfkit';
 import { IsNull, Repository } from 'typeorm';
@@ -21,6 +21,8 @@ interface ParcelReportSections {
 
 @Injectable()
 export class ParcelReportService {
+  private readonly logger = new Logger(ParcelReportService.name);
+
   constructor(
     @InjectRepository(Parcel)
     private readonly parcelRepository: Repository<Parcel>,
@@ -91,13 +93,24 @@ export class ParcelReportService {
       )
       .moveDown();
 
-    if (mapImage) {
-      doc.fontSize(14).text('Map Snapshot', { underline: true }).moveDown(0.5);
-      doc.image(mapImage, {
-        width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
-        align: 'center',
-      });
-      doc.moveDown();
+    if (mapImage && mapImage.length > 0) {
+      try {
+        doc.fontSize(14).text('Map Snapshot', { underline: true }).moveDown(0.5);
+        doc.image(mapImage, {
+          width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+          align: 'center',
+        });
+        doc.moveDown();
+      } catch (error) {
+        // If image format is invalid, skip the image but continue with the report
+        this.logger.warn(
+          `Failed to add map image to PDF for parcel ${sections.parcel.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        doc
+          .fontSize(12)
+          .text('Map snapshot unavailable')
+          .moveDown();
+      }
     }
 
     doc.fontSize(14).text('Risk Summary', { underline: true }).moveDown(0.5);
@@ -228,9 +241,39 @@ export class ParcelReportService {
       if (!response.ok) {
         return null;
       }
+
+      // Check if response is actually an image
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.startsWith('image/')) {
+        // Likely an error response (XML/HTML), not an image
+        return null;
+      }
+
       const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
-    } catch {
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Validate buffer is not empty and appears to be a PNG/JPEG
+      if (buffer.length === 0) {
+        return null;
+      }
+
+      // Basic validation: Check for PNG or JPEG magic bytes
+      const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+      const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+
+      if (!isPng && !isJpeg) {
+        // Buffer doesn't contain a valid image, likely an error response
+        this.logger.warn(
+          `Invalid image format received from GeoServer for parcel ${parcel.id}. Expected PNG/JPEG, got buffer starting with: ${buffer.slice(0, 10).toString('hex')}`,
+        );
+        return null;
+      }
+
+      return buffer;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch map snapshot for parcel ${parcel.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       return null;
     }
   }
